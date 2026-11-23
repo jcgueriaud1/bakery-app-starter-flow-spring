@@ -11,25 +11,30 @@ import com.vaadin.flow.component.grid.testbench.GridTHTDElement;
 import com.vaadin.flow.component.textfield.testbench.TextFieldElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.ProductsViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
-import com.vaadin.testbench.BrowserTest;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
 public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 
 	private static Random r = new Random();
 
 	@Override
-	protected ProductsViewElement openView() {
-		StorefrontViewElement storefront = openLoginView().login("admin@vaadin.com", "admin");
+	protected ProductsViewElement openView(UnifiedPage page) {
+		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");
 		return storefront.getMenu().navigateToProducts();
 	}
 
-	@BrowserTest
-	public void editProductTwice() {
-		ProductsViewElement productsPage = openView();
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void editProductTwice(UnifiedPage page) {
+		setup(page);
+		ProductsViewElement productsPage = openView(page);
 
 		String uniqueName = "Unique cake name " + r.nextInt();
 		String initialPrice = "98.76";
-		int rowNum = createProduct(productsPage, uniqueName, initialPrice);
+		int rowNum = createProduct(page, productsPage, uniqueName, initialPrice);
 		productsPage.openRowForEditing(rowNum);
 
 		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
@@ -40,7 +45,7 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 		productsPage.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
 		GridElement grid = productsPage.getCrud().getGrid();
-		Assertions.assertEquals(rowNum, grid.getCell(newValue).getRow());
+		Assertions.assertEquals(rowNum, grid.getCell(newValue).getIndex());
 
 		productsPage.openRowForEditing(rowNum);
 		newValue = "The " + newValue;
@@ -49,18 +54,20 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 
 		productsPage.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
-		Assertions.assertEquals(rowNum, grid.getCell(newValue).getRow());
+		Assertions.assertEquals(rowNum, grid.getCell(newValue).getIndex());
 	}
 
-	@BrowserTest
-	public void editProduct() {
-		ProductsViewElement productsPage = openView();
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void editProduct(UnifiedPage page) {
+		setup(page);
+		ProductsViewElement productsPage = openView(page);
 
 		String url = getDriver().getCurrentUrl();
 
 		String uniqueName = "Unique cake name " + r.nextInt();
 		String initialPrice = "98.76";
-		int rowIndex = createProduct(productsPage, uniqueName, initialPrice);
+		int rowIndex = createProduct(page, productsPage, uniqueName, initialPrice);
 
 		productsPage.openRowForEditing(rowIndex);
 		Assertions.assertTrue(getDriver().getCurrentUrl().length() > url.length());
@@ -90,9 +97,10 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
 	}
 
-	@BrowserTest
-	public void testCancelConfirmationMessage() {
-		ProductsViewElement productsPage = openView();
+	@Test
+	public void testCancelConfirmationMessage(UnifiedPage page) {
+		setup(page);
+		ProductsViewElement productsPage = openView(page);
 
 		productsPage.getCrud().getNewItemButton().get().click();
 		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
@@ -101,7 +109,8 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 		Assertions.assertEquals(productsPage.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
 	}
 
-	private int createProduct(ProductsViewElement productsPage, String name, String price) {
+	private int createProduct(UnifiedPage page, ProductsViewElement productsPage, String name, String price) {
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
 		productsPage.getSearchBar().getCreateNewButton().click();
 
 		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
@@ -115,7 +124,8 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 		productsPage.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
 
-		return waitUntil((ExpectedCondition<GridTHTDElement>) wd -> productsPage.getCrud().getGrid().getCell(name)).getRow();
+		// TODO unified: TestBench Escape Hatch: waitUntil((ExpectedCondition<GridTHTDElement>) wd -> productsPage.getCrud().getGrid().getCell(name))
+		return testBench.waitUntil((ExpectedCondition<GridTHTDElement>) wd -> productsPage.getCrud().getGrid().getCell(name)).getRow();
 	}
 
 }

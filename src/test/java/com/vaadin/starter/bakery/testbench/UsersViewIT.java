@@ -10,8 +10,12 @@ import com.vaadin.flow.component.textfield.testbench.EmailFieldElement;
 import com.vaadin.flow.component.textfield.testbench.PasswordFieldElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
-import com.vaadin.testbench.BrowserTest;
 import com.vaadin.testbench.TestBenchElement;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
+
 import org.junit.jupiter.api.parallel.Isolated;
 
 @Isolated
@@ -20,14 +24,15 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 	private static Random r = new Random();
 
 	@Override
-	protected UsersViewElement openView() {
-		StorefrontViewElement storefront = openLoginView().login("admin@vaadin.com", "admin");
+	protected UsersViewElement openView(UnifiedPage page) {
+		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");
 		return storefront.getMenu().navigateToUsers();
 	}
 
-	@BrowserTest
-	public void updatePassword() {
-		UsersViewElement usersView = openView();
+	@Test
+	public void updatePassword(UnifiedPage page) {
+		setup(page);
+		UsersViewElement usersView = openView(page);
 
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
@@ -35,7 +40,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 
 		createUser(usersView, uniqueEmail, "Paul", "Irwin", "Vaadin10", "baker");
 
-		int rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
+		int rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getIndex();
 		usersView.openRowForEditing(rowNum);
 
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
@@ -55,7 +60,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// Invalid password prevents closing form
-		rowNum = usersView.getCrud().getGrid().getCell(newEmail).getRow();
+		rowNum = usersView.getCrud().getGrid().getCell(newEmail).getIndex();
 		usersView.openRowForEditing(rowNum);
 
 		emailField = usersView.getEmailField(); // Requery email field.
@@ -76,7 +81,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// When reopening the form password field must be empty.
-		rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
+		rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getIndex();
 		usersView.openRowForEditing(rowNum);
 
 		password = usersView.getPasswordField(); // Requery password field.
@@ -99,11 +104,12 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 	}
 
-	@BrowserTest
-	public void tryToUpdateLockedEntity() {
-		UsersViewElement page = openView();
+	@Test
+	public void tryToUpdateLockedEntity(UnifiedPage page) {
+		setup(page);
+		UsersViewElement page = openView(page);
 
-		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
+		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex();
 		page.openRowForEditing(rowNum);
 
 		PasswordFieldElement field = page.getPasswordField();
@@ -111,14 +117,15 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		page.getEmailField().setValue("barista123@vaadin.com");
 		page.getCrud().getEditorSaveButton().click();
 
-		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
+		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex());
 	}
 
-	@BrowserTest
-	public void tryToDeleteLockedEntity() {
-		UsersViewElement page = openView();
+	@Test
+	public void tryToDeleteLockedEntity(UnifiedPage page) {
+		setup(page);
+		UsersViewElement page = openView(page);
 
-		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
+		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex();
 		page.openRowForEditing(rowNum);
 
 		Assertions.assertTrue(page.getCrud().isEditorOpen());
@@ -126,12 +133,13 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		page.getCrud().getEditorDeleteButton().click();
 		page.getDeleteConfirmDialog().getConfirmButton().click();
 
-		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
+		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex());
 	}
 
-	@BrowserTest
-	public void testCancelConfirmationMessage() {
-		UsersViewElement page = openView();
+	@Test
+	public void testCancelConfirmationMessage(UnifiedPage page) {
+		setup(page);
+		UsersViewElement page = openView(page);
 		page.getSearchBar().getCreateNewButton().click();
 		page.getFirstName().setValue("Some name");
 		page.getCrud().getEditorCancelButton().click();
@@ -139,13 +147,17 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertEquals(page.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
 	}
 
-	@BrowserTest
-	public void accessDenied() {
-		StorefrontViewElement storefront = openLoginView().login("barista@vaadin.com", "barista");
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void accessDenied(UnifiedPage page) {
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
+		setup(page);
+		StorefrontViewElement storefront = openLoginView(page).login("barista@vaadin.com", "barista");
 		Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
 
 		getDriver().get(APP_URL + "users");
-		TestBenchElement link404 = $("vaadin-app-layout > div > a").waitForFirst();
+		// TODO unified: TestBench Escape Hatch: $("vaadin-app-layout > div > a")
+		TestBenchElement link404 = testBench.$("vaadin-app-layout > div > a").waitForFirst();
 
 		Assertions.assertEquals("Go to the front page.", link404.getText());
 	}

@@ -57,3 +57,70 @@ What it doesn't say: the 18 TestBench page objects/custom elements in `testbench
 `openLoginView().login(..)`, `getMenu().navigateToUsers()`, `getCrud().isEditorOpen()`, ...). Every test depends
 on them, and they aren't in the report, so "6 × migrates" overstates what the recipe will do here (finding F1).
 
+## Step 2: Run the Migration Recipe (raw output, committed untouched)
+
+`rewrite.yml` (deleted after the run, it isn't needed any more):
+
+```yaml
+type: specs.openrewrite.org/v1beta/recipe
+name: com.vaadin.starter.bakery.MigrateTestBench
+recipeList:
+  - org.vaadin.addons.unified.rewrite.MigrateTestBenchToUnified:
+      addPlaywright: true
+      includePageObjects: true
+      addAgentSkill: true
+```
+
+```bash
+mvn -U org.openrewrite.maven:rewrite-maven-plugin:6.46.1:run \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha4 \
+  -Drewrite.activeRecipes=com.vaadin.starter.bakery.MigrateTestBench
+```
+
+About 10 s. The options **were applied**: the Playwright adapter and `resolve-migration-markers` skill were added,
+although the guide says alpha4 ignores them (#353) (finding F2).
+
+### What changed
+
+| | |
+|---|---|
+| `pom.xml` | imports `unified-test-bom` 0.1.0-alpha4; adds `unified-test-spring`, `-browserless`, `-playwright`, `-selenium`, `browserless-test-spring`; removes `vaadin-testbench-junit5` |
+| Test classes | the 5 ITs and `AbstractIT`: `extends BrowserTestBase` → `@UnifiedUITest`; `@BrowserTest` → `@Test` + `UnifiedPage page` parameter; `@BeforeEach setup()` → `setup(page)` call at the start of each test; `$(..)` on the test class → `TestBenchEscapeHatch` |
+| Page objects (18 files) | **unchanged**, although `includePageObjects: true` |
+| New files | `AGENTS.md`, `.claude/skills/write-unified-ui-tests/SKILL.md`, `.claude/skills/resolve-migration-markers/SKILL.md` |
+| Diff | 6 test files, +176 / −99 lines |
+
+Counts in the recipe output: **8 Migration Markers**, 6 `TestBenchEscapeHatch.of(page)`, 5
+`@RequiresTestingTool(SELENIUM)` (4 tests + `editOrder`, which is also `@Disabled`).
+
+### Result: it doesn't compile
+
+`mvn test-compile` stops at javac's 100-error limit. Two causes:
+
+1. **The build:** removing `vaadin-testbench-junit5` also removes the element jars the untouched page objects
+   use: `html`, `app-layout`, `board`, `confirm-dialog`, `crud`, `form-layout`, `login` (`*.testbench` packages
+   not found). The Selenium adapter only brings button, checkbox, combo-box, date(-time)-picker, details, dialog,
+   grid, menu-bar, messages, notification, radio-button, tabs, text-field, time-picker and upload (finding F3).
+2. **The test code** (finding F4):
+   - `UsersViewIT`: 3 tests already had a local `UsersViewElement page = openView(..)`, so `openView(page)` now
+     clashes with the new `UnifiedPage page` parameter (`variable page is already defined`).
+   - `AbstractIT`: `extends BrowserTestBase` is gone, but its `@Override getDriver()` (calling `super.getDriver()`)
+     stays, and so do the plain `getDriver()` calls in `AbstractIT`, `LoginIT` and `ProductsViewIT`. They got no
+     Escape Hatch and no marker.
+   - `AbstractIT.openView()` stays `abstract E openView()`, while every override became `openView(UnifiedPage page)`.
+   - `LoginIT.openLoginAfterLoggedIn` calls the test method `loginToNotDefaultUrl()`, which now takes a `page`;
+     the call wasn't updated.
+   - `ProductsViewIT`/`UsersViewIT`: `getCell(text).getRow()` on a TestBench `GridElement` became `.getIndex()`, a
+     method `GridTHTDElement` doesn't have. The grid rule renamed the method although the grid stayed a TestBench
+     element (in `createProduct`, inside the Escape Hatch, `getRow()` was left).
+
+### What the markers don't show
+
+Only the statements that called TestBench **on the test class itself** got a marker or `@RequiresTestingTool`. The
+tests that go through page objects, which is all of them, look migrated but aren't. For example, `LoginIT.loginWorks`
+has no marker and no `@RequiresTestingTool`, and its whole body is TestBench (`openLoginView(page)` →
+`LoginViewElement.login(..)`). On Browserless or Playwright these would fail instead of being skipped (finding F5).
+The app is a Spring Boot app, but the tests had no `@SpringBootTest`: they called an external server at
+`APP_URL`, so they became `@UnifiedUITest`, with no Spring context and no marker about `APP_URL` / `driver.get(url)`
+navigation (finding F6).
+

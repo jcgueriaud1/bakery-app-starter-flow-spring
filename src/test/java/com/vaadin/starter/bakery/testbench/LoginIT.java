@@ -6,44 +6,55 @@ import org.junit.jupiter.api.Test;
 import com.vaadin.starter.bakery.testbench.elements.ui.DashboardViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.LoginViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
-import com.vaadin.testbench.BrowserTest;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
 public class LoginIT extends AbstractIT<LoginViewElement> {
 
-	@BrowserTest
-	public void loginWorks() {
-		LoginViewElement loginView = openLoginView();
+	@Test
+	public void loginWorks(UnifiedPage page) {
+		setup(page);
+		LoginViewElement loginView = openLoginView(page);
 		Assertions.assertEquals("Email", loginView.getUsernameLabel());
 		loginView.login("barista@vaadin.com", "barista");
 	}
 
-	@BrowserTest
-	public void logout() {
-		LoginViewElement loginView = openLoginView();
+	@Test
+	public void logout(UnifiedPage page) {
+		setup(page);
+		LoginViewElement loginView = openLoginView(page);
 		StorefrontViewElement storefront = loginView.login("barista@vaadin.com", "barista");
 		storefront.getMenu().logout();
 		Assertions.assertTrue(getDriver().getCurrentUrl().endsWith("login"));
 	}
 
-	@BrowserTest
-	public void loginToNotDefaultUrl() {
-		LoginViewElement loginView = openLoginView(getDriver(), APP_URL + "dashboard");
+	@Test
+	public void loginToNotDefaultUrl(UnifiedPage page) {
+		setup(page);
+		LoginViewElement loginView = openLoginView(page, getDriver(), APP_URL + "dashboard");
 		DashboardViewElement dashboard = loginView.login("admin@vaadin.com", "admin", DashboardViewElement.class);
 		Assertions.assertNotNull(dashboard);
 	}
 
-	@BrowserTest
-	public void openLoginAfterLoggedIn() {
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void openLoginAfterLoggedIn(UnifiedPage page) {
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
+		setup(page);
 		loginToNotDefaultUrl();
 		// Navigating to /login after user is logged in will forward to storefront view
 		getDriver().get(APP_URL + "login");
-		$(StorefrontViewElement.class).onPage().waitForFirst();
-		Assertions.assertTrue($(LoginViewElement.class).all().isEmpty());
+		// TODO unified: TestBench Escape Hatch: $(StorefrontViewElement.class)
+		testBench.$(StorefrontViewElement.class).onPage().waitForFirst();
+		// TODO unified: TestBench Escape Hatch: $(LoginViewElement.class)
+		Assertions.assertTrue(testBench.$(LoginViewElement.class).all().isEmpty());
 	}
 
 	@Override
-	protected LoginViewElement openView() {
-		return openLoginView();
+	protected LoginViewElement openView(UnifiedPage page) {
+		return openLoginView(page);
 	}
 
 }

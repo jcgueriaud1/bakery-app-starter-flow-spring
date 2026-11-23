@@ -6,6 +6,7 @@ import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import com.vaadin.flow.component.button.testbench.ButtonElement;
 import com.vaadin.flow.component.notification.testbench.NotificationElement;
@@ -15,19 +16,25 @@ import com.vaadin.starter.bakery.testbench.elements.ui.OrderItemEditorElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement.OrderEditorElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
-import com.vaadin.testbench.BrowserTest;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
 public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 
 	@Override
-	protected StorefrontViewElement openView() {
-		return openLoginView().login("admin@vaadin.com", "admin");
+	protected StorefrontViewElement openView(UnifiedPage page) {
+		return openLoginView(page).login("admin@vaadin.com", "admin");
 	}
 
-	@BrowserTest
+	@Test
 	@Disabled
-	public void editOrder() {
-		StorefrontViewElement storefrontPage = openView();
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void editOrder(UnifiedPage page) {
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
+		setup(page);
+		StorefrontViewElement storefrontPage = openView(page);
 
 		int orderIndex = 1;
 
@@ -38,7 +45,8 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 		order.click();
 		ButtonElement editBtn = storefrontPage.getOrderDetails().getEditButton();
 		editBtn.click();
-		waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
+		// TODO unified: TestBench Escape Hatch: waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"))
+		testBench.waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
 
 		OrderEditorElement orderEditor = storefrontPage.getOrderEditor();
 		orderEditor.getOrderItemEditor(0).clickAmountFieldPlus();
@@ -46,7 +54,8 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 		orderEditor.review();
 		storefrontPage.getOrderDetails().getSaveButton().click();
 
-		NotificationElement notification = $(NotificationElement.class).last();
+		// TODO unified: TestBench Escape Hatch: $(NotificationElement.class)
+		NotificationElement notification = testBench.$(NotificationElement.class).last();
 		Assertions.assertTrue(notification.getText().contains("was updated"));
 
 		order = storefrontPage.getOrderCard(orderIndex);
@@ -56,9 +65,10 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 
 	}
 
-	@BrowserTest
-	public void testDialogs() {
-		StorefrontViewElement storefrontPage = openView();
+	@Test
+	public void testDialogs(UnifiedPage page) {
+		setup(page);
+		StorefrontViewElement storefrontPage = openView(page);
 		openAllDialogs(storefrontPage);
 
 		UsersViewElement usersPage = storefrontPage.getMenu().navigateToUsers();
@@ -89,9 +99,10 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 		Assertions.assertFalse(storefrontPage.getDialog().get().isOpen());
 	}
 
-	@BrowserTest
-	public void testTextFieldValidation() {
-		StorefrontViewElement storefrontPage = openView();
+	@Test
+	public void testTextFieldValidation(UnifiedPage page) {
+		setup(page);
+		StorefrontViewElement storefrontPage = openView(page);
 
 		int orderIndex = new Random().nextInt(10);
 
