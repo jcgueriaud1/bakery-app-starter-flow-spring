@@ -40,3 +40,20 @@ Per-test time (run 1): ~30 s for the first test of each class (they all wait on 
 just-started server, in parallel), 1.5–4 s for the next ones (`UsersViewIT` is `@Isolated`, so it runs alone after
 the others).
 
+## Step 1: Dry run (`FindTestClassesToMigrate`)
+
+```bash
+mvn -U org.openrewrite.maven:rewrite-maven-plugin:6.46.1:dryRun \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha4 \
+  -Drewrite.activeRecipes=org.vaadin.addons.unified.rewrite.FindTestClassesToMigrate \
+  -Drewrite.exportDatatables=true
+```
+
+10 s. No file changed. The `TestClasses.csv` data table lists the 5 ITs and `AbstractIT`, all `migrates`, with an
+empty `reason`.
+
+What it doesn't say: the 18 TestBench page objects/custom elements in `testbench/elements` (`LoginViewElement`,
+`StorefrontViewElement`, `OrderCardElement`, `BakeryCrudViewElement`, ...) hold most of the logic (the tests call
+`openLoginView().login(..)`, `getMenu().navigateToUsers()`, `getCrud().isEditorOpen()`, ...). Every test depends
+on them, and they aren't in the report, so "6 × migrates" overstates what the recipe will do here (finding F1).
+
