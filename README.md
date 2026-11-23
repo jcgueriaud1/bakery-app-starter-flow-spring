@@ -32,6 +32,9 @@ Most tests still use TestBench page objects (`testbench/elements`) and run on Se
 (`@RequiresTestingTool(SELENIUM)`), which needs a valid TestBench license. Each run writes a report to
 `target/surefire-reports/unified-evidence/` (`summary.md`, `report.html`, and the User Steps of every test).
 
+How the tests were migrated from TestBench: [MIGRATION_LOG.md](MIGRATION_LOG.md), [findings.md](findings.md) and the
+[migration PR](https://github.com/jcgueriaud1/bakery-app-starter-flow-spring/pull/1).
+
 # Automatic Restart and Live Reload
 
 1. Vaadin Dev Tools interacts `spring-boot-devtools` and is able to automatically reload the browser when code is changed.
