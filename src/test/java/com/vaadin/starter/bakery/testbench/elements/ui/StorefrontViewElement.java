@@ -13,7 +13,7 @@ import com.vaadin.testbench.TestBenchElement;
 import com.vaadin.testbench.elementsbase.Element;
 
 @Element("storefront-view")
-public class StorefrontViewElement extends TestBenchElement implements HasApp, HasCrudView {
+public class StorefrontViewElement extends TestBenchElement implements HasCrudView {
 
 	@Element("order-editor")
 	public static class OrderEditorElement extends TestBenchElement {

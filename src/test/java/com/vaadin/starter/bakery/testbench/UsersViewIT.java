@@ -1,44 +1,71 @@
 package com.vaadin.starter.bakery.testbench;
 
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
 import java.util.Random;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
+import org.springframework.security.test.context.support.WithMockUser;
 
-import com.vaadin.flow.component.tabs.testbench.TabElement;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.textfield.testbench.EmailFieldElement;
 import com.vaadin.flow.component.textfield.testbench.PasswordFieldElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
+import com.vaadin.flow.router.RouterLink;
 import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
-import com.vaadin.testbench.BrowserTest;
-import com.vaadin.testbench.TestBenchElement;
-import org.junit.jupiter.api.parallel.Isolated;
+import com.vaadin.starter.bakery.testbench.wrappers.UnifiedCrud;
+import com.vaadin.starter.bakery.testbench.wrappers.UnifiedEmailField;
+import com.vaadin.starter.bakery.testbench.wrappers.UnifiedPasswordField;
+import com.vaadin.starter.bakery.ui.views.admin.users.UsersView;
+import com.vaadin.testing.unified.RequiresBrowser;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedComboBox;
+import com.vaadin.testing.unified.component.UnifiedGrid;
+import com.vaadin.testing.unified.component.UnifiedTabs;
+import com.vaadin.testing.unified.component.UnifiedTextField;
+import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
 @Isolated
-public class UsersViewIT extends AbstractIT<UsersViewElement> {
+public class UsersViewIT extends AbstractIT {
 
 	private static Random r = new Random();
 
-	@Override
-	protected UsersViewElement openView() {
-		StorefrontViewElement storefront = openLoginView().login("admin@vaadin.com", "admin");
-		return storefront.getMenu().navigateToUsers();
+	private static UsersViewElement openView(UnifiedPage page) {
+		page.navigate(UsersView.class);
+		return TestBenchEscapeHatch.of(page).$(UsersViewElement.class).onPage().first();
 	}
 
-	@BrowserTest
-	public void updatePassword() {
-		UsersViewElement usersView = openView();
+	private static UnifiedGrid users(UnifiedPage page) {
+		return page.find(UnifiedGrid.class);
+	}
+
+	private static int rowOf(UnifiedPage page, String email) {
+		UnifiedGrid.UnifiedGridRow row = users(page).row().withCellText("Email", email);
+		assertThat(row).exists();
+		return row.getIndex();
+	}
+
+	@Test
+	@DisplayName("A user's password is never shown, a weak one is refused and a strong one is saved")
+	// Escape Hatch kept: "New user" is @Id-mapped in the SearchBar LitTemplate; EmailField and PasswordField
+	// have no Wrapper; the Crud's editor state, edit column and buttons have no Wrapper
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
+	public void updatePassword(UnifiedPage page) {
+		UsersViewElement usersView = openView(page);
 
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		String uniqueEmail = "e" + r.nextInt() + "@vaadin.com";
 
-		createUser(usersView, uniqueEmail, "Paul", "Irwin", "Vaadin10", "baker");
+		createUser(page, usersView, uniqueEmail, "Paul", "Irwin", "Vaadin10", "baker");
 
-		int rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
-		usersView.openRowForEditing(rowNum);
-
-		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
+		usersView.openRowForEditing(rowOf(page, uniqueEmail));
 
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
 
@@ -55,8 +82,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// Invalid password prevents closing form
-		rowNum = usersView.getCrud().getGrid().getCell(newEmail).getRow();
-		usersView.openRowForEditing(rowNum);
+		usersView.openRowForEditing(rowOf(page, newEmail));
 
 		emailField = usersView.getEmailField(); // Requery email field.
 		password = usersView.getPasswordField(); // Requery password field.
@@ -76,77 +102,92 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// When reopening the form password field must be empty.
-		rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
-		usersView.openRowForEditing(rowNum);
+		usersView.openRowForEditing(rowOf(page, uniqueEmail));
 
 		password = usersView.getPasswordField(); // Requery password field.
 		Assertions.assertEquals("", password.getDomProperty("value"));
 	}
 
-	private void createUser(UsersViewElement usersView, String email, String firstName, String lastName,
-			String password, String role) {
+	private void createUser(UnifiedPage page, UsersViewElement usersView, String email, String firstName,
+			String lastName, String password, String role) {
 		usersView.getSearchBar().getCreateNewButton().click();
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
 
 		usersView.getEmailField().setValue(email);
-		usersView.getFirstName().setValue(firstName);
-		usersView.getLastName().setValue(lastName);
+		page.find(UnifiedTextField.class).withLabel("First name").setValue(firstName);
+		page.find(UnifiedTextField.class).withLabel("Last name").setValue(lastName);
 		usersView.getPasswordField().setValue(password);
 
-		usersView.getRole().selectByText(role);
+		page.find(UnifiedComboBox.class).withLabel("Role").selectItem(role);
 
 		usersView.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 	}
 
-	@BrowserTest
-	public void tryToUpdateLockedEntity() {
-		UsersViewElement page = openView();
+	@Test
+	@DisplayName("Changing the email of a user who is signed in elsewhere is refused")
+	// the Crud's edit buttons and its button texts exist only in the browser (findings F13)
+	@RequiresBrowser
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
+	public void tryToUpdateLockedEntity(UnifiedPage page) {
+		page.navigate(UsersView.class);
+		UnifiedCrud crud = page.find(UnifiedCrud.class);
 
-		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
-		page.openRowForEditing(rowNum);
+		int rowNum = rowOf(page, "barista@vaadin.com");
+		crud.editRow(rowNum);
+		assertThat(crud).hasProperty("editorOpened", true);
 
-		PasswordFieldElement field = page.getPasswordField();
-		field.setValue("Abc123");
-		page.getEmailField().setValue("barista123@vaadin.com");
-		page.getCrud().getEditorSaveButton().click();
+		page.find(UnifiedPasswordField.class).withLabel("Password").setValue(page.secret("Abc123"));
+		page.find(UnifiedEmailField.class).withLabel("Email (login)").setValue("barista123@vaadin.com");
+		page.find(UnifiedButton.class).withText("Save").click();
 
-		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
+		assertThat(users(page).row(rowNum)).hasCellText("Email", "barista@vaadin.com");
 	}
 
-	@BrowserTest
-	public void tryToDeleteLockedEntity() {
-		UsersViewElement page = openView();
+	@Test
+	@DisplayName("Deleting a user who is signed in elsewhere is refused")
+	// the Crud's edit buttons, its button texts and its confirm dialog exist only in the browser (findings F13)
+	@RequiresBrowser
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
+	public void tryToDeleteLockedEntity(UnifiedPage page) {
+		page.navigate(UsersView.class);
+		UnifiedCrud crud = page.find(UnifiedCrud.class);
 
-		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
-		page.openRowForEditing(rowNum);
+		int rowNum = rowOf(page, "barista@vaadin.com");
+		crud.editRow(rowNum);
+		assertThat(crud).hasProperty("editorOpened", true);
 
-		Assertions.assertTrue(page.getCrud().isEditorOpen());
+		page.find(UnifiedButton.class).withText("Delete").visible().click();
+		// ConfirmDialog has no Wrapper (findings F13)
+		page.findComponent(ConfirmDialog.class).withTextContaining("Are you sure you want to delete").find(UnifiedButton.class).withText("Delete").click();
 
-		page.getCrud().getEditorDeleteButton().click();
-		page.getDeleteConfirmDialog().getConfirmButton().click();
-
-		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
+		assertThat(users(page).row(rowNum)).hasCellText("Email", "barista@vaadin.com");
 	}
 
-	@BrowserTest
-	public void testCancelConfirmationMessage() {
-		UsersViewElement page = openView();
-		page.getSearchBar().getCreateNewButton().click();
-		page.getFirstName().setValue("Some name");
-		page.getCrud().getEditorCancelButton().click();
+	@Test
+	@DisplayName("Cancelling a new user with changes asks to discard them")
+	// Escape Hatch kept: "New user" is @Id-mapped in the SearchBar LitTemplate; the Crud's buttons and confirm
+	// dialogs have no Wrapper
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
+	public void testCancelConfirmationMessage(UnifiedPage page) {
+		UsersViewElement usersView = openView(page);
+		usersView.getSearchBar().getCreateNewButton().click();
+		page.find(UnifiedTextField.class).withLabel("First name").setValue("Some name");
+		usersView.getCrud().getEditorCancelButton().click();
 
-		Assertions.assertEquals(page.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
+		Assertions.assertEquals(usersView.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
 	}
 
-	@BrowserTest
-	public void accessDenied() {
-		StorefrontViewElement storefront = openLoginView().login("barista@vaadin.com", "barista");
-		Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
+	@Test
+	@DisplayName("A barista sees no admin views in the menu and gets a not-found page at the users view")
+	@WithMockUser(username = "barista@vaadin.com", roles = "barista")
+	public void accessDenied(UnifiedPage page) {
+		page.navigate("storefront");
+		assertThat(page.find(UnifiedTabs.class)).hasTabs("Storefront", "Dashboard", "Logout");
 
-		getDriver().get(APP_URL + "users");
-		TestBenchElement link404 = $("vaadin-app-layout > div > a").waitForFirst();
+		page.navigate("users");
 
-		Assertions.assertEquals("Go to the front page.", link404.getText());
+		assertThat(page.findComponent(RouterLink.class).withAccessibleName("Go to the front page.")).isVisible();
 	}
 }
