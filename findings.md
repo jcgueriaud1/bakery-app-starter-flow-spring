@@ -16,6 +16,14 @@ needs a workaround; **Low** is friction, wording or docs.
 | F6 | Medium | Recipe (code) | A Spring Boot app whose ITs hit an externally started server becomes `@UnifiedUITest` with no marker; `APP_URL` navigation is not recognised |
 | F7 | Low | Recipe (build) | The pom rewrite drops comments and puts the test dependencies among the runtime ones |
 | F8 | Low | Reports | Evidence goes under `surefire-reports` in a failsafe run; "scenarios without a check" is all noise after a migration; root navigation reads `open “”` |
+| F9 | High | Unified API (all tools) | Components mapped with `@Id` in a LitTemplate, and LitTemplate components themselves, can't be found on any Testing Tool |
+| F10 | High | Selenium adapter | `navigate(View.class)` on a route with an optional parameter opens the literal template; `isAt(View.class)` fails on that route and on its `@RouteAlias`, on Selenium only |
+| F11 | Medium | Playwright adapter | `selectTab(..)` on a tab whose selection navigates away fails with a raw Playwright `TimeoutError` |
+| F12 | Medium | Wrappers | `UnifiedTabs.selectTab(..)` doesn't follow a `RouterLink` inside the tab, the usual menu pattern |
+| F13 | Medium | Core Set | No Wrapper for `LoginOverlay`/`LoginForm`, `Crud`, `ConfirmDialog`, `EmailField`, `PasswordField`; the Crud's buttons have a name only in a browser |
+| F14 | Medium | `resolve-migration-markers` skill | The skill's full-suite proof (`mvn test`) runs no UI test in the TestBench `*IT` layout, and the skill never runs Selenium, where the kept Escape Hatches live |
+| F15 | Low | API | `withTimeout(..)` loses the Wrapper type; `findComponent(..)` has no `click()`/`withText`; `findComponent(RouterLink.class)` also matches `Anchor`s in browsers |
+| F16 | Low | Docs | `@WithMockUser` needs `spring-boot-starter-security-test`, which the docs and the recipe don't mention |
 
 ## Details
 
@@ -131,3 +139,126 @@ surrounding comments.
   (e.g. "13 scenarios … (12 of them use JUnit assertions, not recorded)").
 - `page.navigate("")` (the root route) is written as the User Step `open “”`. Suggestion: `open “/”` or the root
   view's name.
+
+### F9: nothing inside a LitTemplate can be found
+
+On Bakery's `StorefrontView` and `DashboardView` (both `LitTemplate`s), `page.describe()` lists only the menu tabs,
+on Browserless and on Playwright. Direct lookups fail on both with `Expected exactly one grid, Found none`:
+
+- `page.find(UnifiedGrid.class)` and `page.findComponent(Grid.class)` (the `@Id("grid") Grid<Order>`);
+- the `@Id("search") SearchBar`'s text field and `@Id("action")` button (`withText("New order")`,
+  `withText("New product")`);
+- `findComponent(DashboardCounterLabel.class)` (`@Id`-mapped `LitTemplate`s) → 0.
+
+`page.findComponent(SearchBar.class)` is found where the search bar is a plain child (Products), but `describe()`
+inside it says "no component a Unified UI Test can find".
+
+These are ordinary Flow components with server-side state (a `Grid` with a data provider, `Button`s with
+listeners). TestBench finds them in the browser. Nothing in the docs mentions this gap: neither *Known limitations
+by Testing Tool* nor the spec's gaps appendix. For Bakery it's the main blocker: 7 of 16 tests stay on the TestBench
+Escape Hatch only because of it, and it also blocks creating products or users (the "New …" button) in 4 more.
+
+**Repro:** a `@Route` `LitTemplate` with `@Id("grid") private Grid<X> grid;` →
+`page.navigate(View.class); page.find(UnifiedGrid.class).getRowCount();` on any Testing Tool.
+
+**Suggestion:** support `@Id`-mapped components (on Browserless, walk the template's mapped children; in browsers,
+look inside the template's shadow root). Until then, list it as a known limitation, and have `describe()` say "N
+components inside LitTemplate X are not findable" instead of nothing.
+
+### F10: route templates on Selenium
+
+`StorefrontView` is `@Route("storefront/:orderID?")` with `@RouteAlias("storefront/:orderID/edit")` and
+`@RouteAlias("")`.
+
+- On **Selenium**, `page.navigate(StorefrontView.class)` opens `storefront/:orderID`. The server logs `There was an
+  exception while trying to navigate to 'storefront/:orderID' (IllegalArgumentException: Couldn't parse 'orderID'
+  parameter value ':orderID' as long)`, which is shown nicely under the User Step, and the next lookup fails. The same
+  call works on Browserless and Playwright.
+- On **Selenium**, `assertThat(page).isAt(StorefrontView.class)` fails with `Found “storefront”` (after the login
+  view forwards there) and `Found “”` (after login, at the root alias). It passes on Browserless and Playwright for
+  the same scenario.
+
+So a test that is green on two tools is red on the third, for a reason that has nothing to do with the app.
+
+**Suggestion:** on Selenium, build the URL like the other adapters do (Flow's `RouteConfiguration.getUrl(..)`,
+dropping an optional parameter), and match `isAt` against the route's template and its aliases. Add a route with
+an optional parameter and an alias to the adapter conformance tests.
+
+### F11: `selectTab(..)` when the selection navigates away
+
+Bakery's menu has a "Logout" tab whose selection listener calls `Page.setLocation(..)`. On Playwright,
+`page.find(UnifiedTabs.class).selectTab("Logout")` clicks, the page leaves, and then the adapter reads the
+selected tab (`PlaywrightCoreSetAccess$Tabs.selected`). That times out with `com.microsoft.playwright.TimeoutError:
+Timeout 10000ms exceeded`: not a `UnifiedAssertionError`, with no User Step or evidence.
+
+**Suggestion:** don't verify the selection when the page navigated (as alpha4 already does for combo boxes the app
+replaces, #377), and wrap any Testing Tool error from an action in a `UnifiedAssertionError`.
+
+### F12: Tabs used as a navigation menu
+
+`MainView` builds its menu as `Tabs` whose `Tab`s each hold a `RouterLink`. That's Bakery and many older Vaadin apps:
+`AppLayout` + `Tabs` was the recommended menu before `SideNav`. A user clicks the tab, the click lands on the link,
+and the app navigates. `selectTab("Users")` selects the tab and stays on the same view (Selenium: `Expected the page
+to show “UsersView”, Found “storefront”`). The form that works is
+`page.findComponent(RouterLink.class).withAccessibleName("Users").element().click()`, which needs `element()` and
+reads `click router link …` in the reports.
+
+**Suggestion:** have `selectTab` click what a user clicks (the tab's center, i.e. its link). Or add a Wrapper for
+`RouterLink`/`Anchor` (`UnifiedLink`, with `withText` and `click()`): links are among the most common things a test
+clicks, and `findComponent(..)` gives neither.
+
+### F13: Core Set gaps that a typical business app hits
+
+The Bakery uses these, and its tests touch them:
+
+- **`LoginOverlay`:** the login tests can only stay on TestBench. The form fields exist only in the browser, but a
+  Wrapper with `login(user, password)` for Playwright/Selenium (`@RequiresBrowser`) would cover the "type the
+  password" scenarios.
+- **`Crud`:** editor open or closed, the edit column's button per row, the Save/Cancel/Delete buttons, and the
+  Crud's own discard/delete confirm dialogs. On Browserless the Crud's buttons are `button (no name)` ×4, because
+  their text comes from client-side i18n. On Playwright they're `Save`, `Cancel`, `Delete`, `Discard`. So even
+  `withText("Save")` can't be the same lookup on both tools.
+- **`ConfirmDialog`:** `UnifiedDialog` is for `Dialog` only.
+- **`EmailField`, `PasswordField`:** siblings of `TextField`, very common in forms, with no Wrapper. A sign-up form
+  can't be written with the Core Set.
+
+**Suggestion:** add `UnifiedEmailField`/`UnifiedPasswordField` (same API as `UnifiedTextField`),
+`UnifiedConfirmDialog`, a `UnifiedCrud` (`openEditor(row)`, `save()`, `cancel()`, `delete()`, `isEditorOpen()`), and
+a browser-only `UnifiedLoginOverlay`.
+
+### F14: the skill's proof step can be green on 0 UI tests
+
+Step 3 of `resolve-migration-markers` ends with `mvn test` and `mvn test -Dvaadin.testing.tool=playwright`.
+TestBench projects name their browser tests `*IT` and run them with failsafe, and the TestBench recipe keeps those
+names. Here `mvn test` ran 15 unit tests and **0 UI tests**, and passed. The per-class runs (`-Dtest=LoginIT`) do
+run `*IT` classes, so only the full-suite check is hollow. The cross-class data check it exists for doesn't happen.
+
+The skill also proves every change on Browserless and Playwright only. A test that keeps a TestBench Escape Hatch
+(`@RequiresTestingTool(SELENIUM)`) is skipped on both, so a broken Escape Hatch test passes the skill's proof. In
+this migration 14 of 16 tests run on Selenium only.
+
+**Suggestion:** have the skill detect the runner (`*IT` + failsafe → `mvn verify`, or the profile that binds
+failsafe) and check that the run's summary counts more than 0 UI tests. Add a Selenium run of the classes that
+still have `@RequiresTestingTool(SELENIUM)`. And have the recipe either rename `*IT` to `*Test` or leave a marker in
+the pom.
+
+### F15: small API frictions
+
+- `page.find(UnifiedGrid.class).withTimeout(Duration.ofSeconds(2))` returns `UnifiedWrapper`, so `.getRowCount()`
+  and `.row(0)` don't compile after it. Expected a self-typed return.
+- `page.findComponent(Tab.class)` and `findComponent(RouterLink.class)` return `UnifiedGenericComponent`, which has
+  no `click()` (use `.element().click()`) and no `withText(..)` (use `withAccessibleName(..)`).
+- `findComponent(RouterLink.class)` matched 3 components on Browserless and 4 on Playwright/Selenium. In the
+  browser, the logout `Anchor` (same `<a>` tag) counts as a router link too (`router link in container (id
+  “logout-tab”)`), so the same lookup has a different count per tool.
+- Browserless doesn't follow `Page.setLocation(..)` (Bakery's logout), so the test needs `@RequiresBrowser`. This
+  isn't in *Known limitations*.
+
+### F16: the test dependency for `@WithMockUser`
+
+*Navigation, users and windows* says to use Spring's `@WithMockUser`, which is the natural replacement for a
+TestBench test's login steps. But the annotation is in `spring-security-test`, which a TestBench project usually
+doesn't have (Bakery didn't). The demo has `spring-boot-starter-security-test` in its pom, but no page says so.
+
+**Suggestion:** mention the dependency where `@WithMockUser` is introduced. Have the TestBench recipe add it when
+the project has Spring Security, and turn a login page-object call into a marker suggesting `@WithMockUser`.

@@ -1,49 +1,65 @@
 package com.vaadin.starter.bakery.testbench;
 
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
 import java.util.Random;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
+import org.springframework.security.test.context.support.WithMockUser;
 
-import com.vaadin.flow.component.tabs.testbench.TabElement;
 import com.vaadin.flow.component.textfield.testbench.EmailFieldElement;
 import com.vaadin.flow.component.textfield.testbench.PasswordFieldElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
+import com.vaadin.flow.router.RouterLink;
 import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
-import com.vaadin.testbench.TestBenchElement;
+import com.vaadin.starter.bakery.ui.views.admin.users.UsersView;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedComboBox;
+import com.vaadin.testing.unified.component.UnifiedGrid;
+import com.vaadin.testing.unified.component.UnifiedTabs;
+import com.vaadin.testing.unified.component.UnifiedTextField;
 import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
-import org.junit.jupiter.api.parallel.Isolated;
-
 @Isolated
-public class UsersViewIT extends AbstractIT<UsersViewElement> {
+public class UsersViewIT extends AbstractIT {
 
 	private static Random r = new Random();
 
-	@Override
-	protected UsersViewElement openView(UnifiedPage page) {
-		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");
-		return storefront.getMenu().navigateToUsers();
+	private static UsersViewElement openView(UnifiedPage page) {
+		page.navigate(UsersView.class);
+		return TestBenchEscapeHatch.of(page).$(UsersViewElement.class).onPage().waitForFirst();
+	}
+
+	private static UnifiedGrid users(UnifiedPage page) {
+		return page.find(UnifiedGrid.class);
+	}
+
+	private static int rowOf(UnifiedPage page, String email) {
+		UnifiedGrid.UnifiedGridRow row = users(page).row().withCellText("Email", email);
+		assertThat(row).exists();
+		return row.getIndex();
 	}
 
 	@Test
+	@DisplayName("A user's password is never shown, a weak one is refused and a strong one is saved")
+	// Escape Hatch kept: "New user" is @Id-mapped in the SearchBar LitTemplate; EmailField and PasswordField
+	// have no Wrapper; the Crud's editor state, edit column and buttons have no Wrapper
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
 	public void updatePassword(UnifiedPage page) {
-		setup(page);
 		UsersViewElement usersView = openView(page);
 
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		String uniqueEmail = "e" + r.nextInt() + "@vaadin.com";
 
-		createUser(usersView, uniqueEmail, "Paul", "Irwin", "Vaadin10", "baker");
+		createUser(page, usersView, uniqueEmail, "Paul", "Irwin", "Vaadin10", "baker");
 
-		int rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
-		usersView.openRowForEditing(rowNum);
-
-		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
+		usersView.openRowForEditing(rowOf(page, uniqueEmail));
 
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
 
@@ -60,8 +76,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// Invalid password prevents closing form
-		rowNum = usersView.getCrud().getGrid().getCell(newEmail).getRow();
-		usersView.openRowForEditing(rowNum);
+		usersView.openRowForEditing(rowOf(page, newEmail));
 
 		emailField = usersView.getEmailField(); // Requery email field.
 		password = usersView.getPasswordField(); // Requery password field.
@@ -81,35 +96,37 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// When reopening the form password field must be empty.
-		rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
-		usersView.openRowForEditing(rowNum);
+		usersView.openRowForEditing(rowOf(page, uniqueEmail));
 
 		password = usersView.getPasswordField(); // Requery password field.
 		Assertions.assertEquals("", password.getDomProperty("value"));
 	}
 
-	private void createUser(UsersViewElement usersView, String email, String firstName, String lastName,
-			String password, String role) {
+	private void createUser(UnifiedPage page, UsersViewElement usersView, String email, String firstName,
+			String lastName, String password, String role) {
 		usersView.getSearchBar().getCreateNewButton().click();
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
 
 		usersView.getEmailField().setValue(email);
-		usersView.getFirstName().setValue(firstName);
-		usersView.getLastName().setValue(lastName);
+		page.find(UnifiedTextField.class).withLabel("First name").setValue(firstName);
+		page.find(UnifiedTextField.class).withLabel("Last name").setValue(lastName);
 		usersView.getPasswordField().setValue(password);
 
-		usersView.getRole().selectByText(role);
+		page.find(UnifiedComboBox.class).withLabel("Role").selectItem(role);
 
 		usersView.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 	}
 
 	@Test
+	@DisplayName("Changing the email of a user who is signed in elsewhere is refused")
+	// Escape Hatch kept: EmailField and PasswordField have no Wrapper; the Crud's edit column and buttons have none
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
 	public void tryToUpdateLockedEntity(UnifiedPage page) {
-		setup(page);
 		UsersViewElement usersView = openView(page);
 
-		int rowNum = usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
+		int rowNum = rowOf(page, "barista@vaadin.com");
 		usersView.openRowForEditing(rowNum);
 
 		PasswordFieldElement field = usersView.getPasswordField();
@@ -117,15 +134,18 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		usersView.getEmailField().setValue("barista123@vaadin.com");
 		usersView.getCrud().getEditorSaveButton().click();
 
-		Assertions.assertEquals(rowNum, usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
+		assertThat(users(page).row(rowNum)).hasCellText("Email", "barista@vaadin.com");
 	}
 
 	@Test
+	@DisplayName("Deleting a user who is signed in elsewhere is refused")
+	// Escape Hatch kept: the Crud's edit column, its Delete button and its confirm dialog have no Wrapper
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
 	public void tryToDeleteLockedEntity(UnifiedPage page) {
-		setup(page);
 		UsersViewElement usersView = openView(page);
 
-		int rowNum = usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
+		int rowNum = rowOf(page, "barista@vaadin.com");
 		usersView.openRowForEditing(rowNum);
 
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
@@ -133,32 +153,33 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		usersView.getCrud().getEditorDeleteButton().click();
 		usersView.getDeleteConfirmDialog().getConfirmButton().click();
 
-		Assertions.assertEquals(rowNum, usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
+		assertThat(users(page).row(rowNum)).hasCellText("Email", "barista@vaadin.com");
 	}
 
 	@Test
+	@DisplayName("Cancelling a new user with changes asks to discard them")
+	// Escape Hatch kept: "New user" is @Id-mapped in the SearchBar LitTemplate; the Crud's buttons and confirm
+	// dialogs have no Wrapper
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
 	public void testCancelConfirmationMessage(UnifiedPage page) {
-		setup(page);
 		UsersViewElement usersView = openView(page);
 		usersView.getSearchBar().getCreateNewButton().click();
-		usersView.getFirstName().setValue("Some name");
+		page.find(UnifiedTextField.class).withLabel("First name").setValue("Some name");
 		usersView.getCrud().getEditorCancelButton().click();
 
 		Assertions.assertEquals(usersView.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
+	@DisplayName("A barista sees no admin views in the menu and gets a not-found page at the users view")
+	@WithMockUser(username = "barista@vaadin.com", roles = "barista")
 	public void accessDenied(UnifiedPage page) {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		setup(page);
-		StorefrontViewElement storefront = openLoginView(page).login("barista@vaadin.com", "barista");
-		Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
+		page.navigate("storefront");
+		assertThat(page.find(UnifiedTabs.class)).hasTabs("Storefront", "Dashboard", "Logout");
 
 		page.navigate("users");
-		// TODO unified: TestBench Escape Hatch: $("vaadin-app-layout > div > a")
-		TestBenchElement link404 = testBench.$("vaadin-app-layout > div > a").waitForFirst();
 
-		Assertions.assertEquals("Go to the front page.", link404.getText());
+		assertThat(page.findComponent(RouterLink.class).withAccessibleName("Go to the front page.")).isVisible();
 	}
 }

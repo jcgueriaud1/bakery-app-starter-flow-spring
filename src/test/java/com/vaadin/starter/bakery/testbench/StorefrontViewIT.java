@@ -1,39 +1,52 @@
 package com.vaadin.starter.bakery.testbench;
 
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import com.vaadin.flow.component.button.testbench.ButtonElement;
-import com.vaadin.flow.component.notification.testbench.NotificationElement;
 import com.vaadin.flow.component.textfield.testbench.TextFieldElement;
+import com.vaadin.flow.router.RouterLink;
 import com.vaadin.starter.bakery.testbench.elements.components.OrderCardElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.OrderItemEditorElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement.OrderEditorElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
+import com.vaadin.starter.bakery.ui.views.admin.users.UsersView;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedNotification;
+import com.vaadin.testing.unified.component.UnifiedTabs;
 import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
-public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
+// Escape Hatch kept: the order grid, its order cards, the search bar and the order dialog are @Id-mapped
+// in StorefrontView's LitTemplate (cards drawn by a LitRenderer): no Testing Tool's Unified lookup finds them
+@RequiresTestingTool(TestingTool.SELENIUM)
+@WithMockUser(username = "admin@vaadin.com", roles = "admin")
+public class StorefrontViewIT extends AbstractIT {
 
-	@Override
-	protected StorefrontViewElement openView(UnifiedPage page) {
-		return openLoginView(page).login("admin@vaadin.com", "admin");
+	private static StorefrontViewElement openView(UnifiedPage page) {
+		// navigate(StorefrontView.class) opens "storefront/:orderID" on Selenium (findings F10)
+		page.navigate("storefront");
+		return storefront(page);
+	}
+
+	private static StorefrontViewElement storefront(UnifiedPage page) {
+		return TestBenchEscapeHatch.of(page).$(StorefrontViewElement.class).waitForFirst();
 	}
 
 	@Test
 	@Disabled
-	@RequiresTestingTool(TestingTool.SELENIUM)
+	@DisplayName("Adding one item to an order updates the order card")
 	public void editOrder(UnifiedPage page) {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		setup(page);
 		StorefrontViewElement storefrontPage = openView(page);
 
 		int orderIndex = 1;
@@ -45,8 +58,9 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 		order.click();
 		ButtonElement editBtn = storefrontPage.getOrderDetails().getEditButton();
 		editBtn.click();
-		// TODO unified: TestBench Escape Hatch: waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"))
-		testBench.waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
+		// Escape Hatch kept: the Unified API checks a whole path (hasPath) and the order id isn't known here
+		TestBenchEscapeHatch.of(page)
+				.waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
 
 		OrderEditorElement orderEditor = storefrontPage.getOrderEditor();
 		orderEditor.getOrderItemEditor(0).clickAmountFieldPlus();
@@ -54,9 +68,7 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 		orderEditor.review();
 		storefrontPage.getOrderDetails().getSaveButton().click();
 
-		// TODO unified: TestBench Escape Hatch: $(NotificationElement.class)
-		NotificationElement notification = testBench.$(NotificationElement.class).last();
-		Assertions.assertTrue(notification.getText().contains("was updated"));
+		assertThat(page.find(UnifiedNotification.class).withTextContaining("was updated")).isOpen();
 
 		order = storefrontPage.getOrderCard(orderIndex);
 		Assertions.assertNotNull(order);
@@ -66,15 +78,18 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 	}
 
 	@Test
+	@DisplayName("The new-order and order-details dialogs open and close, also after visiting another view")
 	public void testDialogs(UnifiedPage page) {
-		setup(page);
 		StorefrontViewElement storefrontPage = openView(page);
 		openAllDialogs(storefrontPage);
 
-		UsersViewElement usersPage = storefrontPage.getMenu().navigateToUsers();
-		storefrontPage = usersPage.getMenu().navigateToStorefront();
+		// the menu's tabs hold RouterLinks: selectTab(..) selects a tab without following its link (findings F12)
+		page.findComponent(RouterLink.class).withAccessibleName("Users").element().click();
+		assertThat(page).isAt(UsersView.class);
+		page.findComponent(RouterLink.class).withAccessibleName("Storefront").element().click();
+		assertThat(page.find(UnifiedTabs.class)).hasSelectedTab("Storefront");
 
-		openAllDialogs(storefrontPage);
+		openAllDialogs(storefront(page));
 	}
 
 	private void openAllDialogs(StorefrontViewElement storefrontPage) {
@@ -100,8 +115,8 @@ public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
 	}
 
 	@Test
+	@DisplayName("The order editor rejects a customer name, details or comment longer than 255 characters, and an empty name")
 	public void testTextFieldValidation(UnifiedPage page) {
-		setup(page);
 		StorefrontViewElement storefrontPage = openView(page);
 
 		int orderIndex = new Random().nextInt(10);

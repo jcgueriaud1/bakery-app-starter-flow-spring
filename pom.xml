@@ -160,6 +160,12 @@
             <artifactId>unified-test-spring</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- @WithMockUser: Unified UI Tests run as a user -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- The TestBench page objects (testbench/elements) and Escape Hatches use element jars
              (html, crud, board, login, ...) that unified-test-selenium doesn't bring -->
         <dependency>

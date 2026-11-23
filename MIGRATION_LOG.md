@@ -144,7 +144,7 @@ suite is Selenium-only.**
 | `getIndex()` → `getRow()` back on TestBench `GridTHTDElement` | F4e |
 | `getDriver()` in `LoginIT`/`ProductsViewIT` → `TestBenchEscapeHatch.of(page).getDriver()`, with markers | F4b |
 
-Markers now: 11 (8 from the recipe + 3 `getDriver()` ones added here, in the recipe's own format).
+Markers now: 10 (7 of the recipe's 8: its `getRunLocallyBrowser()` marker went with the grid-IP code; + 3 `getDriver()` ones added here, in the recipe's own format).
 
 ### Runs
 
@@ -162,4 +162,94 @@ Observations on the reports (finding F8):
 - 13 of 16 scenarios are listed under "Scenarios without a check". Expected, since their checks are TestBench
   `Assertions.assert*` calls the recorder can't see, but noisy for a freshly migrated suite.
 - Navigating to the root is reported as `open “”`.
+
+## Step 4: `/resolve-migration-markers` (started by the user, run by the agent)
+
+The skill is user-invoked only (`disable-model-invocation: true`), so the user typed `/resolve-migration-markers`
+and the agent followed it. It took about **14 minutes** (14:37 → 14:51), including reading the API reference and
+the views, and two throwaway probe tests that printed `page.describe()` and tried lookups on each view
+(deleted afterwards).
+
+### What the probes showed
+
+`page.describe()` and direct lookups, signed in as admin with `@WithMockUser`:
+
+| View | Browserless | Playwright |
+|---|---|---|
+| Storefront (`LitTemplate`, grid/dialog/search bar `@Id`-mapped, order cards drawn by a `LitRenderer`) | tabs only | tabs + 3 hidden buttons of `MainView`'s confirm dialog |
+| Dashboard (`LitTemplate`: client-side `vaadin-board`, `@Id` counters, charts, grid) | tabs only; `findComponent(DashboardCounterLabel.class)` → 0 | same |
+| Products / Users (`Crud` built in Java, `SearchBar` template) | grid ✔, editor text fields ✔, combo box ✔; Crud buttons `button (no name)` ×4; **no "New product"/"New user"** | grid ✔, fields ✔, Crud buttons named (`Save`, `Cancel`, `Delete`, `Discard`, all hidden); **no "New product"/"New user"** |
+
+So with alpha4, **nothing a LitTemplate maps with `@Id` can be found, on any Testing Tool** (finding F9). Bakery is
+built on such templates. `EmailField`, `PasswordField`, `LoginOverlay`, `Crud` and `ConfirmDialog` have no
+Wrapper, and the Crud's buttons have a name only in a browser (finding F13).
+
+### What was converted
+
+- **Signing in:** every test that isn't about login now uses Spring's `@WithMockUser` (needs
+  `spring-boot-starter-security-test`, finding F16) instead of typing into the login overlay. This removes the
+  `$(LoginViewElement.class)` entry marker for 4 classes, and each test is one login shorter.
+- **Navigation:** `page.navigate(View.class)` / `page.navigate("storefront")` instead of clicking through the
+  menu page object. The menu is clicked through its `RouterLink`s where the test is about the menu.
+- **Checks:** `assertThat(page).isAt(..)`, `hasPath(..)`, `assertThat(tabs).hasTabs(..)`/`hasSelectedTab(..)`,
+  `UnifiedGrid` rows (`row().withCellText("Email", ..)`, `assertThat(row(n)).hasCellText(..)`), `UnifiedTextField`
+  and `UnifiedComboBox` by label, `UnifiedNotification`.
+- **`@DisplayName`** on every test (the skill's style).
+- **`AbstractIT`** is now a plain `@UnifiedSpringBootTest` base class (one Spring context), without the generic
+  page-object type, `openView()` or the window resizing.
+
+Fully Unified, so they run on more than Selenium: `LoginIT.openLoginAfterLoggedIn` and `UsersViewIT.accessDenied`
+(all 3 tools) and `LoginIT.logout` (`@RequiresBrowser`: the app logs out with `Page.setLocation(..)`, which
+Browserless doesn't follow).
+
+### Problems hit on the way
+
+| Problem | Tool | Workaround | Finding |
+|---|---|---|---|
+| `page.navigate(StorefrontView.class)` opened `storefront/:orderID` (route `storefront/:orderID?`): server error `Couldn't parse ':orderID' as long` | Selenium | `page.navigate("storefront")` | F10 |
+| `assertThat(page).isAt(StorefrontView.class)` fails at `storefront` and at the `""` alias | Selenium (passes on Browserless and Playwright) | `assertThat(tabs).hasSelectedTab("Storefront")` | F10 |
+| `selectTab("Logout")`: the tab's listener navigates away, then the tab's selection is read: raw Playwright `TimeoutError` | Playwright | `findComponent(Tab.class).withAccessibleName("Logout").element().click()` | F11 |
+| `selectTab("Users")` selects the menu tab but doesn't follow the `RouterLink` inside it | all | `findComponent(RouterLink.class).withAccessibleName("Users").element().click()` | F12 |
+| `findComponent(RouterLink.class)` found 3 links on Browserless, 4 in browsers (the logout `Anchor` too) | browsers | `.withAccessibleName("Go to the front page.")` | F15 |
+| `withTimeout(..)` returns `UnifiedWrapper` (can't call `getRowCount()` after it); `findComponent(..)` has no `click()` | all | global `vaadin.testing.timeout`; `element().click()` | F15 |
+
+### Skill step 4: the report
+
+| # | Marker | Outcome | What changed |
+|---|---|---|---|
+| 1 | `AbstractIT`: `getDriver()` (window size) | resolved | setup removed: the adapters choose the window; every test passes without it |
+| 2 | `AbstractIT`: `$(LoginViewElement.class)` | resolved for 4 classes / **kept** in `LoginIT.loginWorks` and `loginToNotDefaultUrl` | `@WithMockUser`; kept: `LoginOverlay` has no Wrapper, its form exists only in the browser |
+| 3 | `LoginIT`: `getDriver()` (URL ends with `login`) | resolved | `assertThat(page).isAt(LoginView.class)` |
+| 4 | `LoginIT`: `$(StorefrontViewElement.class)` | resolved | `assertThat(tabs).hasSelectedTab("Storefront")` (F10) |
+| 5 | `LoginIT`: `$(LoginViewElement.class)` (absent) | resolved | same check: the user is on the storefront |
+| 6 | `ProductsViewIT`: `getDriver()` (URL) | resolved / **kept** | `hasPath("products")`; kept for "the URL has the product id": `hasPath` needs the whole path |
+| 7 | `ProductsViewIT`: `waitUntil(.. getCell(name))` | resolved | `page.find(UnifiedGrid.class).row().withCellText("Product Name", name)` |
+| 8 | `UsersViewIT`: `$("vaadin-app-layout > div > a")` | resolved | `findComponent(RouterLink.class).withAccessibleName("Go to the front page.")` |
+| 9 | `StorefrontViewIT.editOrder`: `waitUntil(URL matches …/edit)` | **kept** | `hasPath` needs the whole path; the test is `@Disabled` |
+| 10 | `StorefrontViewIT.editOrder`: `$(NotificationElement.class).last()` | resolved | `assertThat(page.find(UnifiedNotification.class).withTextContaining("was updated")).isOpen()` |
+
+No `TODO unified:` left. **11 `// Escape Hatch kept:` comments**, each with its reason: the whole of
+`DashboardViewIT` and `StorefrontViewIT` (LitTemplate content, F9); the Crud flows in `ProductsViewIT` and 4 of 5
+`UsersViewIT` tests ("New …" in the SearchBar template, F9; Crud, `EmailField`, `PasswordField`, confirm dialogs
+without Wrapper, F13); the 2 real-login tests (`LoginOverlay`, F13).
+
+`editOrder` was given one try without `@Disabled` on Selenium: it fails in the old TestBench page object
+(`OrderItemEditorElement` looks for `div[part='increase-button']`, which Vaadin 25's integer field doesn't have).
+That breakage predates the migration, so the test stays `@Disabled`.
+
+### Skill step 3: prove it
+
+- Per class, on Browserless and Playwright as the skill says, and on Selenium too: all pass or are skipped
+  (Selenium-only classes are skipped on the other two).
+- The skill's full-suite proof, `mvn test`, ran **15 unit tests and 0 UI tests** and was green. The recipe kept
+  the `*IT` names, which surefire excludes (finding F14). The real full-suite runs:
+
+| Tool | Command | Result | Wall time |
+|---|---|---|---|
+| Browserless | `mvn verify -Pit` | **2 passed**, 15 skipped | 12 s |
+| Playwright | `mvn verify -Pit -Dvaadin.testing.tool=playwright` | **3 passed**, 14 skipped | 15 s |
+| Selenium | `mvn verify -Pit -Dvaadin.testing.tool=selenium` | **16 passed**, 1 skipped | 28 s |
+
+Compared with the Browserless run (`vaadin.testing.user-steps.compare-dir`): "2 scenarios ran on both Testing
+Tools: same result and same User Steps on each."
 
