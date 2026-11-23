@@ -3,6 +3,8 @@
 Issues, surprises and suggestions found while migrating the Bakery's TestBench suite with
 `org.vaadin.addons:unified-test-*:0.1.0-alpha4`. Process: [MIGRATION_LOG.md](MIGRATION_LOG.md).
 
+Filed upstream as [parttio/unified-testing-tool#524](https://github.com/parttio/unified-testing-tool/issues/524) and its sub-issues: F3, F7 → #525; F4 → #526; F1, F5 → #527; F6, F16 → #528; F14, F18 → #529; F10 → #530; F11, F12, part of F15 → #531; F13, F17 → #532; F8 → #533 and #512; F9 → #347 (comment added). F2 and `withTimeout` (F15) are listed in #524.
+
 Severity: **High** blocks the migration or gives a wrong result without warning; **Medium** costs real time or
 needs a workaround; **Low** is friction, wording or docs.
 
