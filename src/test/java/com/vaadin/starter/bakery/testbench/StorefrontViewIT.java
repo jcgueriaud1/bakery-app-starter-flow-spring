@@ -40,7 +40,7 @@ public class StorefrontViewIT extends AbstractIT {
 	}
 
 	private static StorefrontViewElement storefront(UnifiedPage page) {
-		return TestBenchEscapeHatch.of(page).$(StorefrontViewElement.class).waitForFirst();
+		return TestBenchEscapeHatch.of(page).$(StorefrontViewElement.class).first();
 	}
 
 	@Test
@@ -59,8 +59,8 @@ public class StorefrontViewIT extends AbstractIT {
 		ButtonElement editBtn = storefrontPage.getOrderDetails().getEditButton();
 		editBtn.click();
 		// Escape Hatch kept: the Unified API checks a whole path (hasPath) and the order id isn't known here
-		TestBenchEscapeHatch.of(page)
-				.waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
+		page.waitUntil(() -> testBench.getDriver().getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
 
 		OrderEditorElement orderEditor = storefrontPage.getOrderEditor();
 		orderEditor.getOrderItemEditor(0).clickAmountFieldPlus();

@@ -21,7 +21,7 @@ public class DashboardViewIT extends AbstractIT {
 
 	private static DashboardViewElement openView(UnifiedPage page) {
 		page.navigate(DashboardView.class);
-		return TestBenchEscapeHatch.of(page).$(DashboardViewElement.class).waitForFirst();
+		return TestBenchEscapeHatch.of(page).$(DashboardViewElement.class).first();
 	}
 
 	@Test

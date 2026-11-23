@@ -28,7 +28,7 @@ public class ProductsViewIT extends AbstractIT {
 
 	private static ProductsViewElement openView(UnifiedPage page) {
 		page.navigate(ProductsView.class);
-		return TestBenchEscapeHatch.of(page).$(ProductsViewElement.class).onPage().waitForFirst();
+		return TestBenchEscapeHatch.of(page).$(ProductsViewElement.class).onPage().first();
 	}
 
 	private static UnifiedTextField productName(UnifiedPage page) {

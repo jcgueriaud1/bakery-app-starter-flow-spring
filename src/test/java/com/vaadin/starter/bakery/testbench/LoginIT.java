@@ -27,7 +27,7 @@ public class LoginIT extends AbstractIT {
 	public void loginWorks(UnifiedPage page) {
 		page.navigate(LoginView.class);
 		// Escape Hatch kept: LoginOverlay has no Wrapper and its form fields exist only in the browser
-		LoginViewElement loginView = TestBenchEscapeHatch.of(page).$(LoginViewElement.class).waitForFirst();
+		LoginViewElement loginView = TestBenchEscapeHatch.of(page).$(LoginViewElement.class).first();
 		Assertions.assertEquals("Email", loginView.getUsernameLabel());
 		loginView.login("barista@vaadin.com", "barista");
 
@@ -55,7 +55,7 @@ public class LoginIT extends AbstractIT {
 	public void loginToNotDefaultUrl(UnifiedPage page) {
 		page.navigate(DashboardView.class);
 		// Escape Hatch kept: LoginOverlay has no Wrapper and its form fields exist only in the browser
-		LoginViewElement loginView = TestBenchEscapeHatch.of(page).$(LoginViewElement.class).waitForFirst();
+		LoginViewElement loginView = TestBenchEscapeHatch.of(page).$(LoginViewElement.class).first();
 		loginView.login("admin@vaadin.com", "admin", DashboardViewElement.class);
 
 		assertThat(page).isAt(DashboardView.class);

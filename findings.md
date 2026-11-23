@@ -22,8 +22,10 @@ needs a workaround; **Low** is friction, wording or docs.
 | F12 | Medium | Wrappers | `UnifiedTabs.selectTab(..)` doesn't follow a `RouterLink` inside the tab, the usual menu pattern |
 | F13 | Medium | Core Set | No Wrapper for `LoginOverlay`/`LoginForm`, `Crud`, `ConfirmDialog`, `EmailField`, `PasswordField`; the Crud's buttons have a name only in a browser |
 | F14 | Medium | `resolve-migration-markers` skill | The skill's full-suite proof (`mvn test`) runs no UI test in the TestBench `*IT` layout, and the skill never runs Selenium, where the kept Escape Hatches live |
-| F15 | Low | API | `withTimeout(..)` loses the Wrapper type; `findComponent(..)` has no `click()`/`withText`; `findComponent(RouterLink.class)` also matches `Anchor`s in browsers |
+| F15 | Low | API | `withTimeout(..)` loses the Wrapper type; `findComponent(..)` has no `click()`; `findComponent(RouterLink.class)` also matches `Anchor`s in browsers |
 | F16 | Low | Docs | `@WithMockUser` needs `spring-boot-starter-security-test`, which the docs and the recipe don't mention |
+| F17 | Low | Playwright vs Selenium | `findComponent(ConfirmDialog.class).visible()` finds the open dialog on Selenium, none on Playwright |
+| F18 | Low | Style rules / recipe | The recipe and the marker skill leave TestBench waits that `UnifiedStyleRules` then rejects |
 
 ## Details
 
@@ -247,7 +249,7 @@ the pom.
 - `page.find(UnifiedGrid.class).withTimeout(Duration.ofSeconds(2))` returns `UnifiedWrapper`, so `.getRowCount()`
   and `.row(0)` don't compile after it. Expected a self-typed return.
 - `page.findComponent(Tab.class)` and `findComponent(RouterLink.class)` return `UnifiedGenericComponent`, which has
-  no `click()` (use `.element().click()`) and no `withText(..)` (use `withAccessibleName(..)`).
+  no `click()` (use `.element().click()`), though it has `withText(..)` and is a Scope.
 - `findComponent(RouterLink.class)` matched 3 components on Browserless and 4 on Playwright/Selenium. In the
   browser, the logout `Anchor` (same `<a>` tag) counts as a router link too (`router link in container (id
   “logout-tab”)`), so the same lookup has a different count per tool.
@@ -262,3 +264,25 @@ doesn't have (Bakery didn't). The demo has `spring-boot-starter-security-test` i
 
 **Suggestion:** mention the dependency where `@WithMockUser` is introduced. Have the TestBench recipe add it when
 the project has Spring Security, and turn a login page-object call into a marker suggesting `@WithMockUser`.
+
+### F17: `.visible()` on a confirm dialog differs between Playwright and Selenium
+
+With the Crud's delete confirmation open, `page.findComponent(ConfirmDialog.class).visible()` finds it on Selenium
+and finds none on Playwright (`Expected exactly one confirm dialog (visible), Found none`). In the browser the
+`vaadin-confirm-dialog` host has no box; what the user sees is its overlay. `UnifiedDialog` presumably handles this
+for `Dialog`. A generic lookup on an overlay component doesn't, and the two browser adapters disagree.
+
+**Suggestion:** treat overlay components (`*-dialog`, `*-overlay` hosts) as visible when their overlay is open, the
+same on every adapter. That would also come for free with a `UnifiedConfirmDialog` (F13).
+
+### F18: the migration's own output fails the style rules
+
+`write-unified-ui-tests` says to run `UnifiedStyleRules.ALL` after writing tests. After the recipe and
+`resolve-migration-markers`, the rules failed 7 times on "No raw waits": `ElementQuery.waitForFirst(..)` and
+`TestBenchEscapeHatch.waitUntil(..)` in TestBench Escape Hatch code, all in tests or helpers of a class with
+`@RequiresTestingTool(SELENIUM)`. The recipe keeps `waitForFirst()`, and the marker skill's "Escape Hatch kept"
+outcome keeps it too, so the toolchain's two halves disagree.
+
+**Suggestion:** either allow the Testing Tool's own waits inside code that declares that Testing Tool (it's the
+Escape Hatch's point), or have the recipe write `first()` after a Unified `navigate(..)` and `page.waitUntil(..)` for a
+TestBench `waitUntil(..)`, and have the marker skill run the style rules in its proof step.

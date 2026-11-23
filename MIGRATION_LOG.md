@@ -253,3 +253,46 @@ That breakage predates the migration, so the test stays `@Disabled`.
 Compared with the Browserless run (`vaadin.testing.user-steps.compare-dir`): "2 scenarios ran on both Testing
 Tools: same result and same User Steps on each."
 
+## Step 5: Custom Wrappers, style rules, stability
+
+Beyond the markers, the skill's reference for a component without a Wrapper is "write one next to the tests". Time-boxed
+attempt, on the two `UsersViewIT` tests that don't need the "New user" button (blocked by F9):
+
+| Wrapper (`testbench/wrappers`) | For | Methods |
+|---|---|---|
+| `UnifiedEmailField` | Flow `EmailField` | `withLabel`, `setValue`, `getValue` |
+| `UnifiedPasswordField` | Flow `PasswordField` | same |
+| `UnifiedCrud` | Flow `Crud` | `editRow(int)` (clicks the row's `vaadin-crud-edit`), `isEditorOpen()` |
+
+65 lines, about 15 minutes including two failed tries:
+- The Crud's delete confirmation has a "Delete" button like the editor's, both visible:
+  `page.find(UnifiedButton.class).withText("Delete").visible()` → `Found 2`. Scoped with
+  `page.findComponent(ConfirmDialog.class)`.
+- `findComponent(ConfirmDialog.class).visible()` found the open dialog on Selenium but **none on Playwright**: the
+  `vaadin-confirm-dialog` host has no size there, since the content is in its overlay (finding F17). Picked it with
+  `.withTextContaining("Are you sure you want to delete")` instead.
+
+`tryToUpdateLockedEntity` and `tryToDeleteLockedEntity` are now fully Unified and `@RequiresBrowser` (the Crud's
+edit buttons and button texts exist only in the browser): they now also run on Playwright. The other TestBench
+tests all need the search bar's "New …" button or the Crud's hidden toolbar button (F9), so they stay on the
+Escape Hatch.
+
+### Style rules
+
+Added `UnifiedStyleTest` (ArchUnit, `unified-test-archunit`), as `write-unified-ui-tests` says. First run: 7
+violations, all **"No raw waits"** on `ElementQuery.waitForFirst(..)` / `TestBenchEscapeHatch.waitUntil(..)`. That's
+code the recipe produced and the marker skill kept, in tests that declare `@RequiresTestingTool(SELENIUM)` (finding
+F18). Fixed with `first()`, since `page.navigate(..)` already waited for the server, and with
+`page.waitUntil(..)`. The style test then passes.
+
+### Stability: full suite, 3 rounds per tool
+
+| Tool | Round 1 | Round 2 | Round 3 | Passed / skipped |
+|---|---|---|---|---|
+| Browserless | ✔ 12.7 s | ✔ 12.1 s | ✔ 14.2 s | 2 / 15 |
+| Playwright | ✔ 16.7 s | ✔ 16.6 s | ✔ 17.7 s | 5 / 12 |
+| Selenium | ✔ 26.3 s | ✔ 26.7 s | ✔ 27.0 s | 16 / 1 (`@Disabled`) |
+
+9 of 9 runs green, no flaky test. (Wall time of `mvn verify -Pit`, whole build included.) The Playwright run
+compared with the Browserless run: "2 scenarios ran on both Testing Tools: same result and same User Steps on each."
+

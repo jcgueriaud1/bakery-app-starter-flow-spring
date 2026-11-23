@@ -10,14 +10,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.springframework.security.test.context.support.WithMockUser;
 
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.textfield.testbench.EmailFieldElement;
 import com.vaadin.flow.component.textfield.testbench.PasswordFieldElement;
 import com.vaadin.flow.router.RouterLink;
 import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
+import com.vaadin.starter.bakery.testbench.wrappers.UnifiedCrud;
+import com.vaadin.starter.bakery.testbench.wrappers.UnifiedEmailField;
+import com.vaadin.starter.bakery.testbench.wrappers.UnifiedPasswordField;
 import com.vaadin.starter.bakery.ui.views.admin.users.UsersView;
+import com.vaadin.testing.unified.RequiresBrowser;
 import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedButton;
 import com.vaadin.testing.unified.component.UnifiedComboBox;
 import com.vaadin.testing.unified.component.UnifiedGrid;
 import com.vaadin.testing.unified.component.UnifiedTabs;
@@ -31,7 +37,7 @@ public class UsersViewIT extends AbstractIT {
 
 	private static UsersViewElement openView(UnifiedPage page) {
 		page.navigate(UsersView.class);
-		return TestBenchEscapeHatch.of(page).$(UsersViewElement.class).onPage().waitForFirst();
+		return TestBenchEscapeHatch.of(page).$(UsersViewElement.class).onPage().first();
 	}
 
 	private static UnifiedGrid users(UnifiedPage page) {
@@ -120,38 +126,40 @@ public class UsersViewIT extends AbstractIT {
 
 	@Test
 	@DisplayName("Changing the email of a user who is signed in elsewhere is refused")
-	// Escape Hatch kept: EmailField and PasswordField have no Wrapper; the Crud's edit column and buttons have none
-	@RequiresTestingTool(TestingTool.SELENIUM)
+	// the Crud's edit buttons and its button texts exist only in the browser (findings F13)
+	@RequiresBrowser
 	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
 	public void tryToUpdateLockedEntity(UnifiedPage page) {
-		UsersViewElement usersView = openView(page);
+		page.navigate(UsersView.class);
+		UnifiedCrud crud = page.find(UnifiedCrud.class);
 
 		int rowNum = rowOf(page, "barista@vaadin.com");
-		usersView.openRowForEditing(rowNum);
+		crud.editRow(rowNum);
+		assertThat(crud).hasProperty("editorOpened", true);
 
-		PasswordFieldElement field = usersView.getPasswordField();
-		field.setValue("Abc123");
-		usersView.getEmailField().setValue("barista123@vaadin.com");
-		usersView.getCrud().getEditorSaveButton().click();
+		page.find(UnifiedPasswordField.class).withLabel("Password").setValue(page.secret("Abc123"));
+		page.find(UnifiedEmailField.class).withLabel("Email (login)").setValue("barista123@vaadin.com");
+		page.find(UnifiedButton.class).withText("Save").click();
 
 		assertThat(users(page).row(rowNum)).hasCellText("Email", "barista@vaadin.com");
 	}
 
 	@Test
 	@DisplayName("Deleting a user who is signed in elsewhere is refused")
-	// Escape Hatch kept: the Crud's edit column, its Delete button and its confirm dialog have no Wrapper
-	@RequiresTestingTool(TestingTool.SELENIUM)
+	// the Crud's edit buttons, its button texts and its confirm dialog exist only in the browser (findings F13)
+	@RequiresBrowser
 	@WithMockUser(username = "admin@vaadin.com", roles = "admin")
 	public void tryToDeleteLockedEntity(UnifiedPage page) {
-		UsersViewElement usersView = openView(page);
+		page.navigate(UsersView.class);
+		UnifiedCrud crud = page.find(UnifiedCrud.class);
 
 		int rowNum = rowOf(page, "barista@vaadin.com");
-		usersView.openRowForEditing(rowNum);
+		crud.editRow(rowNum);
+		assertThat(crud).hasProperty("editorOpened", true);
 
-		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
-
-		usersView.getCrud().getEditorDeleteButton().click();
-		usersView.getDeleteConfirmDialog().getConfirmButton().click();
+		page.find(UnifiedButton.class).withText("Delete").visible().click();
+		// ConfirmDialog has no Wrapper (findings F13)
+		page.findComponent(ConfirmDialog.class).withTextContaining("Are you sure you want to delete").find(UnifiedButton.class).withText("Delete").click();
 
 		assertThat(users(page).row(rowNum)).hasCellText("Email", "barista@vaadin.com");
 	}
