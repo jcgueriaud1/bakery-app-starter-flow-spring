@@ -316,3 +316,145 @@ Left as they were, outside this migration's scope:
   image. Pointing the tests at an external server (`vaadin.testing.base-url`) would mean a non-Spring
   `@UnifiedUITest` base class, which wasn't tried.
 
+## Comparison
+
+TestBench suite at `59c7c46` vs. Unified alpha4 suite at the end of this branch. All runs on the same machine,
+`mvn verify -Pit`, dev mode.
+
+### Where each test runs
+
+| Test | TestBench | Unified: Browserless | Unified: Playwright | Unified: Selenium |
+|---|---|---|---|---|
+| `LoginIT.loginWorks` | ✔ | – | – | ✔ (Escape Hatch: `LoginOverlay`) |
+| `LoginIT.logout` | ✔ | – (`setLocation` not followed) | ✔ | ✔ |
+| `LoginIT.loginToNotDefaultUrl` | ✔ | – | – | ✔ (Escape Hatch: `LoginOverlay`) |
+| `LoginIT.openLoginAfterLoggedIn` | ✔ | ✔ | ✔ | ✔ |
+| `DashboardViewIT` ×2 | ✔ | – | – | ✔ (Escape Hatch: LitTemplate) |
+| `ProductsViewIT` ×3 | ✔ | – | – | ✔ (Escape Hatch: SearchBar template, Crud) |
+| `StorefrontViewIT.testDialogs`, `testTextFieldValidation` | ✔ | – | – | ✔ (Escape Hatch: LitTemplate) |
+| `StorefrontViewIT.editOrder` | `@Disabled` | `@Disabled` | `@Disabled` | `@Disabled` |
+| `UsersViewIT.updatePassword`, `testCancelConfirmationMessage` | ✔ | – | – | ✔ (Escape Hatch: SearchBar template, Crud, Email/PasswordField) |
+| `UsersViewIT.tryToUpdateLockedEntity`, `tryToDeleteLockedEntity` | ✔ | – | ✔ | ✔ (custom Wrappers) |
+| `UsersViewIT.accessDenied` | ✔ | ✔ | ✔ | ✔ |
+| **Tests run** | **16** | **2** | **5** | **16** |
+
+**5 of 16 tests run without TestBench** (Playwright), and 2 run without a browser at all. 11 stay on the TestBench
+Escape Hatch, each with a one-line reason. 9 of those 11 are blocked only by LitTemplate `@Id` lookups (F9) and missing
+Core Set Wrappers (F13), not by anything in the tests.
+
+### Speed and stability
+
+| | TestBench (before) | Unified on Selenium | Unified on Playwright | Unified on Browserless |
+|---|---|---|---|---|
+| Wall time, whole `mvn verify -Pit` | 85 s / 38 s / 89 s | 26.3 / 26.7 / 27.0 s | 16.7 / 16.6 / 17.7 s | 12.7 / 12.1 / 14.2 s |
+| Runs green | **2 of 3** (5 × `SessionNotCreated`: Chrome failed to start in parallel) | 3 of 3 | 3 of 3 | 3 of 3 |
+| Browser | a local, visible Chrome per test, tests in parallel | one headless Chrome per run, a fresh tab per test | one headless Chromium per run | none |
+| Server | `spring-boot:start` before failsafe, port 8080 | in the test JVM, random port, one Spring context | same | same |
+| Sign-in | through the login form in 15 of 16 tests | `@WithMockUser` (test-only endpoint) in 14, the form in 2 (the login tests) | same | security context set directly |
+
+The Selenium run is **about 30 % faster than the best TestBench run and 3× faster than the worst**, and it wasn't flaky.
+That comes from reusing one headless browser, signing in without the form, and having no separate application start.
+The tests themselves still do the same work through the same TestBench page objects. The Browserless and
+Playwright runs cover fewer tests, so their times aren't comparable.
+
+### Code
+
+| | TestBench (before) | Unified (after) |
+|---|---|---|
+| Test classes (`AbstractIT` + 5 ITs) | 527 lines | 633 lines (+20 %: `@DisplayName`s, Escape Hatch reasons, imports) |
+| Page objects (`testbench/elements`) | 417 lines, 18 files | 345 lines, 15 files (3 deleted, the rest still needed) |
+| Custom Wrappers | – | 65 lines, 3 files (`EmailField`, `PasswordField`, `Crud`) |
+| Style rules test | – | 15 lines (passes) |
+| JUnit `Assertions.*` in tests | 52 | 41 |
+| Retrying `assertThat(..)` (Unified) | 0 | 20 |
+| `TestBenchEscapeHatch.of(page)` | – | 8 |
+| `// Escape Hatch kept: <reason>` | – | 9 |
+| `@RequiresTestingTool(SELENIUM)` / `@RequiresBrowser` | – | 7 / 3 |
+| Test dependencies | `vaadin-testbench-junit5` | `unified-test-bom` + `-spring`, `-browserless`, `-playwright`, `-selenium`, `-archunit`; `browserless-test-spring`; `spring-boot-starter-security-test`; still `vaadin-testbench-junit6` for the page objects |
+
+One fully converted test, before and after:
+
+```java
+// TestBench
+@BrowserTest
+public void accessDenied() {
+    StorefrontViewElement storefront = openLoginView().login("barista@vaadin.com", "barista");
+    Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
+
+    getDriver().get(APP_URL + "users");
+    TestBenchElement link404 = $("vaadin-app-layout > div > a").waitForFirst();
+
+    Assertions.assertEquals("Go to the front page.", link404.getText());
+}
+
+// Unified: runs on Browserless, Playwright and Selenium
+@Test
+@DisplayName("A barista sees no admin views in the menu and gets a not-found page at the users view")
+@WithMockUser(username = "barista@vaadin.com", roles = "barista")
+public void accessDenied(UnifiedPage page) {
+    page.navigate("storefront");
+    assertThat(page.find(UnifiedTabs.class)).hasTabs("Storefront", "Dashboard", "Logout");
+
+    page.navigate("users");
+
+    assertThat(page.findComponent(RouterLink.class).withAccessibleName("Go to the front page.")).isVisible();
+}
+```
+
+and its report (`user-steps.txt`, Selenium):
+
+```text
+✔ UsersViewIT › A barista sees no admin views in the menu and gets a not-found page at the users view   selenium · 0.4 s
+   1  open “storefront”
+   2  see tabs with tabs “Storefront”, “Dashboard”, “Logout”
+   3  open “users”
+   4  see router link “Go to the front page.”
+```
+
+The Unified test checks the tab *names*, not just their count, and finds the link by what the user reads instead
+of a CSS path.
+
+### Reports and failures
+
+| | TestBench | Unified |
+|---|---|---|
+| Per test | surefire stack trace | `user-steps.txt`/`.json`; on failure: screenshot (browsers) or component tree, and `<test>.view.txt` |
+| Per run | failsafe summary | `summary.md`, `summary.json`, `report.html`, "scenarios without a check", cross-tool comparison |
+| Failure message | `NoSuchElementException: No element with tag <div> found with the attributes [part='increase-button']` | `Failed at User Step 2 of 2: select tab “Logout” in tabs / Expected exactly one tabs / Found none / Waited 10 s / Code LoginIT.java:42`, with the server's error under the step it happened in (`⚠ server ERROR … Couldn't parse 'orderID' …`) |
+
+The server-log-under-the-step line found the cause of F10 in one read. The TestBench suite had no equivalent.
+
+### The migration itself
+
+| Phase | Time (wall clock) | Who |
+|---|---|---|
+| Baseline, 3 runs | 4 min | agent |
+| Dry run | 1 min | agent |
+| Recipe run | < 1 min | agent |
+| Making the recipe's output compile and run (F3–F6) | 3 min | agent |
+| `/resolve-migration-markers` (probes, conversion, 3-tool runs) | 14 min | user started it, agent followed it |
+| Custom Wrappers, style rules, stability runs | 7 min | agent |
+| Cleanup, production-profile check | 2 min | agent |
+| **Total** | **≈ 37 min** (14:24 → 15:01) plus writing these notes | one manual step (typing the skill command) |
+
+What the tooling did, in proportion:
+- **The recipe** did the mechanical part: build, annotations, `UnifiedPage` parameters, `@BeforeEach` inlining.
+  But its output **didn't compile** (F3, F4), and its 8 markers covered almost none of the real work, because
+  that sat in the page objects (F5).
+- **The marker skill** gave a clear, usable procedure and good reference tables. Its proof step was hollow here
+  (F14), and its outcome then failed the style rules (F18).
+- **Most of the effort** went into finding out what the Unified API can't see in this app: LitTemplates (F9),
+  missing Wrappers (F13), the menu pattern (F12), and Selenium's route handling (F10). `page.describe()` was the
+  best tool for that: one print per view answered "can I find it?" on each Testing Tool.
+
+### Verdict
+
+For the Bakery, alpha4 gives **a faster and stabler Selenium suite with much better reports right away**, even
+where tests still run through TestBench page objects. It gives **real multi-tool coverage for less than a third of
+the tests** (5 of 16 on Playwright, 2 of 16 on Browserless). The ceiling isn't the tests: it's alpha4's blindness to
+`@Id`-mapped LitTemplate components (F9) and the missing `Crud`/`ConfirmDialog`/`EmailField`/`PasswordField`/
+`LoginOverlay` Wrappers (F13). With those two fixed, most of the remaining 11 Selenium-only tests could be
+converted the way `accessDenied` and the locked-entity tests were. The recipe needs F3/F4/F5 fixed before it can be
+called a migration rather than a starting point on a suite built on `TestBenchElement` page objects.
+
+18 findings in [findings.md](findings.md): 5 High (F3, F4, F5, F9, F10), 5 Medium (F6, F11–F14), 8 Low.

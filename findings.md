@@ -6,6 +6,10 @@ Issues, surprises and suggestions found while migrating the Bakery's TestBench s
 Severity: **High** blocks the migration or gives a wrong result without warning; **Medium** costs real time or
 needs a workaround; **Low** is friction, wording or docs.
 
+**18 findings: 5 High, 5 Medium, 8 Low.** The two that limit the result most are F9 (nothing inside a LitTemplate can
+be found) and F13 (no Wrapper for `Crud`, `ConfirmDialog`, `EmailField`, `PasswordField`, `LoginOverlay`). The recipe's
+output needed F3–F6 fixed by hand before it compiled and ran.
+
 | # | Severity | Area | Summary |
 |---|---|---|---|
 | F1 | Low | `FindTestClassesToMigrate` | The dry run reports every class as `migrates` but doesn't list the page objects/custom elements they depend on |
