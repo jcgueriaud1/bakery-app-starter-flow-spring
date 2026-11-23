@@ -206,8 +206,8 @@
 
     <profiles>
 
-        <!-- Moving spring-boot start/stop into a separate profile speeds up regular builds.
-             Execute mvn verify -Pit to run integration tests -->
+        <!-- UI tests (Unified UI Tests, *IT). Execute mvn verify -Pit to run them on Browserless,
+             add -Dvaadin.testing.tool=playwright or selenium for a browser -->
         <profile>
             <id>it</id>
             <activation>
@@ -232,9 +232,6 @@
                         <configuration>
                             <trimStackTrace>false</trimStackTrace>
                             <enableAssertions>true</enableAssertions>
-                            <systemPropertyVariables>
-                                <com.vaadin.testbench.Parameters.runLocally>chrome</com.vaadin.testbench.Parameters.runLocally>
-                            </systemPropertyVariables>
                         </configuration>
                     </plugin>
                 </plugins>

@@ -5,7 +5,7 @@ import com.vaadin.testbench.TestBenchElement;
 import com.vaadin.testbench.elementsbase.Element;
 
 @Element("dashboard-view")
-public class DashboardViewElement extends TestBenchElement implements HasApp {
+public class DashboardViewElement extends TestBenchElement {
 
 	public BoardElement getBoard() {
 		return $(BoardElement.class).first();

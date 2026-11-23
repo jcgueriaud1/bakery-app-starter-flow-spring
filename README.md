@@ -18,18 +18,19 @@ Note that when running in development mode, the application will not work in IE1
 
 # Running Integration Tests and Linter
 
-Integration tests are implemented using TestBench. The tests take a couple of minutes to run and are therefore included in a separate profile. We recommend running tests with a production build to minimize the chance of development time toolchains affecting test stability. To run the tests, execute
+The UI tests (`src/test/java/.../testbench/*IT.java`) are [Unified UI Tests](https://github.com/parttio/unified-testing-tool):
+each test starts the application itself (`@UnifiedSpringBootTest`) and runs on the Testing Tool you choose. They are in
+a separate profile:
 
-`mvn verify -Pit,production`
-
-and make sure you have a valid TestBench license installed.
-
-Profile `it` adds the following parameter to run integration tests:
 ```sh
--Dcom.vaadin.testbench.Parameters.runLocally=chrome
+mvn verify -Pit                                        # Browserless (no browser): the tests that need none
+mvn verify -Pit -Dvaadin.testing.tool=playwright       # headless Chromium, downloaded on the first run
+mvn verify -Pit -Dvaadin.testing.tool=selenium         # headless Chrome through TestBench
 ```
 
-if you would like to run a separate test make sure you have added these parameters to VM Options of JUnit run configuration
+Most tests still use TestBench page objects (`testbench/elements`) and run on Selenium only
+(`@RequiresTestingTool(SELENIUM)`), which needs a valid TestBench license. Each run writes a report to
+`target/surefire-reports/unified-evidence/` (`summary.md`, `report.html`, and the User Steps of every test).
 
 # Automatic Restart and Live Reload
 

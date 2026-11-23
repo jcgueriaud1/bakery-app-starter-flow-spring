@@ -296,3 +296,23 @@ F18). Fixed with `first()`, since `page.navigate(..)` already waited for the ser
 9 of 9 runs green, no flaky test. (Wall time of `mvn verify -Pit`, whole build included.) The Playwright run
 compared with the Browserless run: "2 scenarios ran on both Testing Tools: same result and same User Steps on each."
 
+## Step 6: Cleanup
+
+- Deleted the menu page objects no test uses any more (navigation now goes through `page.navigate(..)` and
+  `RouterLink`s): `HasApp`, `MainViewElement`, `AppNavigationElement` (−3 files, −56 lines).
+  `ItemDetailDialogElement` was already unused before the migration and is left as it was.
+- `pom.xml`, profile `it`: the comment says how to run on each Testing Tool; TestBench's `runLocally=chrome`
+  parameter is gone (the Selenium adapter runs headless Chrome by default).
+- `README.md`: the "Running Integration Tests" section explains the three Testing Tools and that most tests are
+  still Selenium-only.
+- Checked the README's recommended `mvn verify -Pit,production -Dvaadin.testing.tool=selenium`: 16 passed,
+  1 skipped, 32 s.
+
+Left as they were, outside this migration's scope:
+- `it-saucelabs` still passes TestBench's grid parameters. The Unified Selenium adapter would need its own
+  configuration (`SELENIUM_REMOTE_URL`, `vaadin.testing.selenium.*`), which wasn't tried.
+- `it-native` was meant to run the ITs against a native executable started outside the build. A
+  `@UnifiedSpringBootTest` always starts the application in the test JVM, so that profile no longer tests the native
+  image. Pointing the tests at an external server (`vaadin.testing.base-url`) would mean a non-Spring
+  `@UnifiedUITest` base class, which wasn't tried.
+

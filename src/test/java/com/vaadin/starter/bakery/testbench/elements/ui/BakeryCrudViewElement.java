@@ -6,7 +6,7 @@ import com.vaadin.flow.component.formlayout.testbench.FormLayoutElement;
 import com.vaadin.starter.bakery.testbench.elements.components.SearchBarElement;
 import com.vaadin.testbench.TestBenchElement;
 
-public class BakeryCrudViewElement extends TestBenchElement implements HasApp {
+public class BakeryCrudViewElement extends TestBenchElement {
 
 	public SearchBarElement getSearchBar() {
 		return $(SearchBarElement.class).first();
