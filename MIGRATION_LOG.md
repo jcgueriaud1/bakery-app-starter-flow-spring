@@ -7,6 +7,8 @@ Migration of the Bakery app's TestBench integration tests (`src/test/java/.../te
 - Branch: `unified-testing-tool-alpha4`, from `v25` at `59c7c46` (Vaadin 25.3.5, Spring Boot 4.1.2).
 - Environment: macOS (Darwin 25.6, arm64), OpenJDK 25.0.3, Maven, Chrome, cached Playwright Chromium.
 - Issues with the tool: see [findings.md](findings.md). Before/after comparison: [at the end](#comparison).
+- Migration PR (draft): https://github.com/jcgueriaud1/bakery-app-starter-flow-spring/pull/1
+- Upstream feedback: [parttio/unified-testing-tool#524](https://github.com/parttio/unified-testing-tool/issues/524) and its sub-issues.
 
 Each step is one commit (or several, as noted).
 
