@@ -45,7 +45,7 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 		productsPage.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
 		GridElement grid = productsPage.getCrud().getGrid();
-		Assertions.assertEquals(rowNum, grid.getCell(newValue).getIndex());
+		Assertions.assertEquals(rowNum, grid.getCell(newValue).getRow());
 
 		productsPage.openRowForEditing(rowNum);
 		newValue = "The " + newValue;
@@ -54,7 +54,7 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 
 		productsPage.getCrud().getEditorSaveButton().click();
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
-		Assertions.assertEquals(rowNum, grid.getCell(newValue).getIndex());
+		Assertions.assertEquals(rowNum, grid.getCell(newValue).getRow());
 	}
 
 	@Test
@@ -63,14 +63,16 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 		setup(page);
 		ProductsViewElement productsPage = openView(page);
 
-		String url = getDriver().getCurrentUrl();
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
+		// TODO unified: TestBench Escape Hatch: getDriver()
+		String url = testBench.getDriver().getCurrentUrl();
 
 		String uniqueName = "Unique cake name " + r.nextInt();
 		String initialPrice = "98.76";
 		int rowIndex = createProduct(page, productsPage, uniqueName, initialPrice);
 
 		productsPage.openRowForEditing(rowIndex);
-		Assertions.assertTrue(getDriver().getCurrentUrl().length() > url.length());
+		Assertions.assertTrue(testBench.getDriver().getCurrentUrl().length() > url.length());
 
 		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
 
@@ -83,7 +85,7 @@ public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
 
 		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
 
-		Assertions.assertTrue(getDriver().getCurrentUrl().endsWith("products"));
+		Assertions.assertTrue(testBench.getDriver().getCurrentUrl().endsWith("products"));
 
 		productsPage.openRowForEditing(rowIndex);
 

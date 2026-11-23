@@ -40,7 +40,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 
 		createUser(usersView, uniqueEmail, "Paul", "Irwin", "Vaadin10", "baker");
 
-		int rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getIndex();
+		int rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
 		usersView.openRowForEditing(rowNum);
 
 		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
@@ -60,7 +60,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// Invalid password prevents closing form
-		rowNum = usersView.getCrud().getGrid().getCell(newEmail).getIndex();
+		rowNum = usersView.getCrud().getGrid().getCell(newEmail).getRow();
 		usersView.openRowForEditing(rowNum);
 
 		emailField = usersView.getEmailField(); // Requery email field.
@@ -81,7 +81,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
 		// When reopening the form password field must be empty.
-		rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getIndex();
+		rowNum = usersView.getCrud().getGrid().getCell(uniqueEmail).getRow();
 		usersView.openRowForEditing(rowNum);
 
 		password = usersView.getPasswordField(); // Requery password field.
@@ -107,44 +107,44 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 	@Test
 	public void tryToUpdateLockedEntity(UnifiedPage page) {
 		setup(page);
-		UsersViewElement page = openView(page);
+		UsersViewElement usersView = openView(page);
 
-		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex();
-		page.openRowForEditing(rowNum);
+		int rowNum = usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
+		usersView.openRowForEditing(rowNum);
 
-		PasswordFieldElement field = page.getPasswordField();
+		PasswordFieldElement field = usersView.getPasswordField();
 		field.setValue("Abc123");
-		page.getEmailField().setValue("barista123@vaadin.com");
-		page.getCrud().getEditorSaveButton().click();
+		usersView.getEmailField().setValue("barista123@vaadin.com");
+		usersView.getCrud().getEditorSaveButton().click();
 
-		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex());
+		Assertions.assertEquals(rowNum, usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
 	}
 
 	@Test
 	public void tryToDeleteLockedEntity(UnifiedPage page) {
 		setup(page);
-		UsersViewElement page = openView(page);
+		UsersViewElement usersView = openView(page);
 
-		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex();
-		page.openRowForEditing(rowNum);
+		int rowNum = usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
+		usersView.openRowForEditing(rowNum);
 
-		Assertions.assertTrue(page.getCrud().isEditorOpen());
+		Assertions.assertTrue(usersView.getCrud().isEditorOpen());
 
-		page.getCrud().getEditorDeleteButton().click();
-		page.getDeleteConfirmDialog().getConfirmButton().click();
+		usersView.getCrud().getEditorDeleteButton().click();
+		usersView.getDeleteConfirmDialog().getConfirmButton().click();
 
-		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getIndex());
+		Assertions.assertEquals(rowNum, usersView.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
 	}
 
 	@Test
 	public void testCancelConfirmationMessage(UnifiedPage page) {
 		setup(page);
-		UsersViewElement page = openView(page);
-		page.getSearchBar().getCreateNewButton().click();
-		page.getFirstName().setValue("Some name");
-		page.getCrud().getEditorCancelButton().click();
+		UsersViewElement usersView = openView(page);
+		usersView.getSearchBar().getCreateNewButton().click();
+		usersView.getFirstName().setValue("Some name");
+		usersView.getCrud().getEditorCancelButton().click();
 
-		Assertions.assertEquals(page.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
+		Assertions.assertEquals(usersView.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
 	}
 
 	@Test
@@ -155,7 +155,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		StorefrontViewElement storefront = openLoginView(page).login("barista@vaadin.com", "barista");
 		Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
 
-		getDriver().get(APP_URL + "users");
+		page.navigate("users");
 		// TODO unified: TestBench Escape Hatch: $("vaadin-app-layout > div > a")
 		TestBenchElement link404 = testBench.$("vaadin-app-layout > div > a").waitForFirst();
 

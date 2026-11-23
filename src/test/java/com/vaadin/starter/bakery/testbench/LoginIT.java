@@ -27,13 +27,14 @@ public class LoginIT extends AbstractIT<LoginViewElement> {
 		LoginViewElement loginView = openLoginView(page);
 		StorefrontViewElement storefront = loginView.login("barista@vaadin.com", "barista");
 		storefront.getMenu().logout();
-		Assertions.assertTrue(getDriver().getCurrentUrl().endsWith("login"));
+		// TODO unified: TestBench Escape Hatch: getDriver()
+		Assertions.assertTrue(TestBenchEscapeHatch.of(page).getDriver().getCurrentUrl().endsWith("login"));
 	}
 
 	@Test
 	public void loginToNotDefaultUrl(UnifiedPage page) {
 		setup(page);
-		LoginViewElement loginView = openLoginView(page, getDriver(), APP_URL + "dashboard");
+		LoginViewElement loginView = openLoginView(page, "dashboard");
 		DashboardViewElement dashboard = loginView.login("admin@vaadin.com", "admin", DashboardViewElement.class);
 		Assertions.assertNotNull(dashboard);
 	}
@@ -43,9 +44,9 @@ public class LoginIT extends AbstractIT<LoginViewElement> {
 	public void openLoginAfterLoggedIn(UnifiedPage page) {
 		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
 		setup(page);
-		loginToNotDefaultUrl();
+		loginToNotDefaultUrl(page);
 		// Navigating to /login after user is logged in will forward to storefront view
-		getDriver().get(APP_URL + "login");
+		page.navigate("login");
 		// TODO unified: TestBench Escape Hatch: $(StorefrontViewElement.class)
 		testBench.$(StorefrontViewElement.class).onPage().waitForFirst();
 		// TODO unified: TestBench Escape Hatch: $(LoginViewElement.class)

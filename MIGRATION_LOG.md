@@ -124,3 +124,42 @@ The app is a Spring Boot app, but the tests had no `@SpringBootTest`: they calle
 `APP_URL`, so they became `@UnifiedUITest`, with no Spring context and no marker about `APP_URL` / `driver.get(url)`
 navigation (finding F6).
 
+## Step 3: Make it build and run (on Selenium)
+
+Goal: the smallest change that makes the recipe's output compile and pass, with the tests' meaning unchanged. The
+result is the honest "recipe + minimal fixes" state: **every test still drives the TestBench page objects, so the
+suite is Selenium-only.**
+
+| Change | Why |
+|---|---|
+| `pom.xml`: add `com.vaadin:vaadin-testbench-junit6` (test) | F3: brings back the element jars (`html`, `crud`, `board`, `login`, `app-layout`, `form-layout`, `confirm-dialog`) the page objects use; JUnit 6 flavour, like the adapter's TestBench core |
+| `pom.xml`, profile `it`: remove `spring-boot:start/stop` | the app now starts inside the test JVM (`@UnifiedSpringBootTest`, random port) |
+| `AbstractIT`: `@UnifiedUITest` → `@UnifiedSpringBootTest` | F6: Bakery is a Spring Boot app |
+| `AbstractIT`: `@RequiresTestingTool(SELENIUM)` on the class (inherited since alpha4) | F5: every test uses TestBench page objects |
+| `AbstractIT`: drop `APP_URL`, the `IPAddress` grid logic, the `getDriver()` override; `openLoginView(page, path)` uses `page.navigate(path)` | F4b, F6: the base URL is the adapter's job |
+| `AbstractIT.setup(page)`: `getDriver()` → `testBench.getDriver()` (marker added), `throws Exception` dropped | F4b, and F4f: the old `@BeforeEach ... throws Exception` became a call in test methods that don't declare it |
+| `abstract E openView()` → `openView(UnifiedPage page)` | F4c |
+| `UsersViewIT`: local `page` → `usersView` | F4a |
+| `LoginIT`: `loginToNotDefaultUrl(page)`; `getDriver().get(APP_URL + "login")` → `page.navigate("login")` | F4d |
+| `getIndex()` → `getRow()` back on TestBench `GridTHTDElement` | F4e |
+| `getDriver()` in `LoginIT`/`ProductsViewIT` → `TestBenchEscapeHatch.of(page).getDriver()`, with markers | F4b |
+
+Markers now: 11 (8 from the recipe + 3 `getDriver()` ones added here, in the recipe's own format).
+
+### Runs
+
+| Run | Command | Result | Wall time |
+|---|---|---|---|
+| Selenium | `mvn verify -Pit -Dvaadin.testing.tool=selenium` | 16 passed, 1 skipped (`@Disabled`) | **29 s** |
+| Browserless | `mvn verify -Pit` | 17 skipped (`@RequiresTestingTool(SELENIUM)`) | 6 s |
+
+The Selenium run is faster than the TestBench baseline (38–89 s): one headless Chrome reused for the run, a fresh tab
+per test (`vaadin.testing.selenium.reuse-browser=true`), instead of a Chrome per test, and no separate app start.
+The run writes `summary.md`, `summary.json` and `report.html`, with a `user-steps.txt` per test.
+
+Observations on the reports (finding F8):
+- The evidence goes to `target/surefire-reports/unified-evidence` even though failsafe runs the tests.
+- 13 of 16 scenarios are listed under "Scenarios without a check". Expected, since their checks are TestBench
+  `Assertions.assert*` calls the recorder can't see, but noisy for a freshly migrated suite.
+- Navigating to the root is reported as `open “”`.
+

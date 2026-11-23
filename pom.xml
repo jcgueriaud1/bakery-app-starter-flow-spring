@@ -160,6 +160,13 @@
             <artifactId>unified-test-spring</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- The TestBench page objects (testbench/elements) and Escape Hatches use element jars
+             (html, crud, board, login, ...) that unified-test-selenium doesn't bring -->
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-testbench-junit6</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 
@@ -198,28 +205,7 @@
             </activation>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>pre-integration-test</id>
-                                <goals>
-                                    <goal>start</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>post-integration-test</id>
-                                <goals>
-                                    <goal>stop</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <wait>1000</wait>
-                            <maxAttempts>180</maxAttempts>
-                        </configuration>
-                    </plugin>
+                    <!-- @UnifiedSpringBootTest starts the application in the test JVM -->
                     <plugin>
                         <artifactId>maven-failsafe-plugin</artifactId>
                         <version>3.5.3</version>

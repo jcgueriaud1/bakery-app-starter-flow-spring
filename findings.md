@@ -15,6 +15,7 @@ needs a workaround; **Low** is friction, wording or docs.
 | F5 | High | Recipe (code) | `TestBenchElement`-style page objects are not converted and calls to them get no marker or `@RequiresTestingTool`, so 8 markers hide 16 unconverted tests |
 | F6 | Medium | Recipe (code) | A Spring Boot app whose ITs hit an externally started server becomes `@UnifiedUITest` with no marker; `APP_URL` navigation is not recognised |
 | F7 | Low | Recipe (build) | The pom rewrite drops comments and puts the test dependencies among the runtime ones |
+| F8 | Low | Reports | Evidence goes under `surefire-reports` in a failsafe run; "scenarios without a check" is all noise after a migration; root navigation reads `open “”` |
 
 ## Details
 
@@ -68,6 +69,7 @@ After the recipe:
 | c | Overrides of `openView()` became `openView(UnifiedPage page)`, the abstract declaration in the base class didn't | `is not abstract and does not override abstract method openView()` |
 | d | A test calling another test method (`loginToNotDefaultUrl()` from `openLoginAfterLoggedIn`): the callee now needs `page`, the call isn't updated | `cannot be applied to given types` |
 | e | `grid.getCell(text).getRow()` on a TestBench `GridElement` that stays TestBench is renamed to `getIndex()`, which `GridTHTDElement` doesn't have. Elsewhere in the same file (inside an Escape Hatch) `getRow()` is kept | `cannot find symbol` |
+| f | `@BeforeEach void setup() throws Exception` becomes a `setup(page)` call at the start of each test, but the tests don't declare `throws Exception` | `unreported exception java.lang.Exception` |
 
 **Suggestion:** (a) pick a free name for the parameter (`unifiedPage`) or rename the clashing local; (b) when a
 class loses `BrowserTestBase`, rewrite `getDriver()` to `testBench.getDriver()` with a marker, and drop an override
@@ -117,3 +119,15 @@ dependencies (`browserless-test-spring` before `h2`, the adapters after `spring-
 
 **Suggestion:** insert the new test-scope dependencies where the removed TestBench dependency was, keeping the
 surrounding comments.
+
+### F8: report details on a migrated, failsafe-run suite
+
+- `vaadin.testing.evidence-dir` defaults to `target/surefire-reports/unified-evidence` even when failsafe runs the
+  tests (the `*IT` layout the TestBench recipe keeps). Next to `target/failsafe-reports` you'd expect
+  `target/failsafe-reports/unified-evidence`.
+- Right after migration, "Scenarios without a check" lists 13 of 16 scenarios. Their checks are TestBench/JUnit
+  `Assertions` the recorder can't see. That's correct per spec, but a migrated suite always starts with this noise.
+  Suggestion: in the summary, say how many of those scenarios call `Assertions.*`/`assert*` after the last step
+  (e.g. "13 scenarios … (12 of them use JUnit assertions, not recorded)").
+- `page.navigate("")` (the root route) is written as the User Step `open “”`. Suggestion: `open “/”` or the root
+  view's name.
