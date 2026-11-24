@@ -77,3 +77,23 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
 - **Suggestion:** mask only the value typed into the password field (and the field's value in failures), not a global
   find/replace; or at least don't mask inside the display name and inside a longer word / e-mail.
 
+## F7: No way to reach plain HTML written in a template's shadow DOM, even in a browser (api)
+
+- **Step:** 4 (`DashboardViewIT.checkRowsCount`)
+- The test counts the `<vaadin-board-row>`s that `dashboard-view.js` writes in its Lit template (no `@Id`, no
+  server-side component). `page.findTemplate(DashboardView.class).element().findDescendants("vaadin-board-row")`
+  returns **0** on Playwright and Selenium – `findDescendants` doesn't enter the template's shadow root – and the
+  Findable View lists only `Template <dashboard-view>`.
+- That's consistent with ADR 0012 (only `@Id` components inside a Template), but it leaves the Escape Hatch as the only
+  option for a browser-only check; TestBench's `$` pierced shadow roots by default. Kept as a TestBench Escape Hatch
+  (Selenium only) rather than Playwright `unwrap(Page.class)` to keep the original code.
+- **Suggestion:** document that `UnifiedElement.findDescendants` doesn't pierce shadow roots; consider a browser-only
+  `findDescendants` that does (Playwright's CSS engine pierces open shadow roots by default anyway).
+
+## F8 (positive): `@WithUserDetails` + `@Id` components in a Template work on Browserless
+
+- **Step:** 4 (`DashboardViewIT.checkCounters`)
+- `@WithUserDetails("admin@vaadin.com")` (the app's own `UserDetailsService`) signed the user in on all three tools with
+  no extra setup, and `page.findTemplate(DashboardView.class).findComponent(DashboardCounterLabel.class)` with
+  `hasCount(4)` passes on Browserless, Playwright and Selenium. The test used to need a real browser + login form.
+
