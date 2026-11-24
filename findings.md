@@ -60,3 +60,20 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
   marked, not only the one that submits. Also, it's a `LoginIT`: every test there checks the login itself, so
   `@WithMockUser` advice is noise for that class.
 
+## F6: Password masking redacts the same word everywhere, incl. the user name and `@DisplayName` (bug)
+
+- **Step:** 4 (`LoginIT`)
+- `page.find(UnifiedLogin.class).login("barista@vaadin.com", "barista")`: the password is treated as a secret of the run,
+  and every occurrence of the *string* `barista` in the reports is replaced. `user-steps.txt` reads:
+  ```
+  ✔ LoginIT › A signed-in •••• logs out from the menu and is back at the login
+     1  Sign in as ••••@vaadin.com
+        1.2  sign in as “••••@vaadin.com” in login
+  ```
+  The `@DisplayName` ("A signed-in barista …"), the `page.step` name and the user name are all mangled, though only
+  the password was secret. The same happens with `admin` / `admin@vaadin.com`.
+- Demo apps (and Spring Security samples) very often use password == user name prefix, so this hits most first
+  experiences of `login(..)`.
+- **Suggestion:** mask only the value typed into the password field (and the field's value in failures), not a global
+  find/replace; or at least don't mask inside the display name and inside a longer word / e-mail.
+

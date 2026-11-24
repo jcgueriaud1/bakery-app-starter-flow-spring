@@ -10,9 +10,8 @@ import com.vaadin.testing.unified.RequiresTestingTool;
 import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 
-public class DashboardViewIT extends AbstractIT<DashboardViewElement> {
+public class DashboardViewIT extends AbstractIT {
 
-	@Override
 	protected DashboardViewElement openView(UnifiedPage page) {
 		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
 		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");

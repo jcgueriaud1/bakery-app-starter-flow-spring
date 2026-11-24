@@ -1,69 +1,73 @@
 package com.vaadin.starter.bakery.testbench;
 
-import org.junit.jupiter.api.Assertions;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.vaadin.starter.bakery.testbench.elements.ui.DashboardViewElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.LoginViewElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.starter.bakery.ui.views.dashboard.DashboardView;
+import com.vaadin.starter.bakery.ui.views.login.LoginView;
+import com.vaadin.starter.bakery.ui.views.storefront.StorefrontView;
+import com.vaadin.testing.unified.RequiresBrowser;
 import com.vaadin.testing.unified.UnifiedPage;
-import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
+import com.vaadin.testing.unified.component.UnifiedLogin;
+import com.vaadin.testing.unified.component.UnifiedTabs;
+import com.vaadin.testing.unified.component.UnifiedTextField;
 
-public class LoginIT extends AbstractIT<LoginViewElement> {
-
-	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void loginWorks(UnifiedPage page) throws Exception {
-		setup(page);
-		LoginViewElement loginView = openLoginView(page);
-		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
-		Assertions.assertEquals("Email", loginView.getUsernameLabel());
-		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
-		loginView.login("barista@vaadin.com", "barista");
-	}
+// These tests check the login form itself, which posts to Spring Security's /login: a browser is needed.
+@RequiresBrowser
+public class LoginIT extends AbstractIT {
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void logout(UnifiedPage page) throws Exception {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		setup(page);
-		LoginViewElement loginView = openLoginView(page);
-		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
-		StorefrontViewElement storefront = loginView.login("barista@vaadin.com", "barista");
-		storefront.getMenu().logout();
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		Assertions.assertTrue(testBench.getDriver().getCurrentUrl().endsWith("login"));
+	@DisplayName("A barista signs in through the login form and lands on the storefront")
+	public void loginWorks(UnifiedPage page) {
+		page.navigate(LoginView.class);
+		UnifiedLogin login = page.find(UnifiedLogin.class);
+		assertThat(login).isOpen();
+		assertThat(page.find(UnifiedTextField.class).withLabel("Email")).exists();
+
+		login.login("barista@vaadin.com", "barista");
+
+		assertThat(page).isAt(StorefrontView.class);
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void loginToNotDefaultUrl(UnifiedPage page) throws Exception {
-		setup(page);
-		LoginViewElement loginView = openLoginView(page, "dashboard");
-		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
-		DashboardViewElement dashboard = loginView.login("admin@vaadin.com", "admin", DashboardViewElement.class);
-		Assertions.assertNotNull(dashboard);
+	@DisplayName("A signed-in barista logs out from the menu and is back at the login")
+	public void logout(UnifiedPage page) {
+		signIn(page, "barista@vaadin.com", "barista");
+		assertThat(page).isAt(StorefrontView.class);
+
+		page.find(UnifiedTabs.class).selectTab("Logout");
+
+		assertThat(page).isAt(LoginView.class);
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void openLoginAfterLoggedIn(UnifiedPage page) throws Exception {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		setup(page);
-		loginToNotDefaultUrl(page);
-		// Navigating to /login after user is logged in will forward to storefront view
-		page.navigate("login");
-		// TODO unified: TestBench Escape Hatch: $(StorefrontViewElement.class)
-		testBench.$(StorefrontViewElement.class).onPage().waitForFirst();
-		// TODO unified: TestBench Escape Hatch: $(LoginViewElement.class)
-		Assertions.assertTrue(testBench.$(LoginViewElement.class).all().isEmpty());
+	@DisplayName("Opening the dashboard signed out asks to sign in, then shows the dashboard")
+	public void loginToNotDefaultUrl(UnifiedPage page) {
+		page.navigate(DashboardView.class);
+		assertThat(page).isAt(LoginView.class);
+
+		page.find(UnifiedLogin.class).login("admin@vaadin.com", "admin");
+
+		assertThat(page).isAt(DashboardView.class);
 	}
 
-	@Override
-	protected LoginViewElement openView(UnifiedPage page) {
-		return openLoginView(page);
+	@Test
+	@DisplayName("Opening the login while signed in shows the storefront instead")
+	public void openLoginAfterLoggedIn(UnifiedPage page) {
+		signIn(page, "admin@vaadin.com", "admin");
+
+		page.navigate(LoginView.class);
+
+		assertThat(page).isAt(StorefrontView.class);
+		assertThat(page.find(UnifiedLogin.class)).doesNotExist();
 	}
 
+	private static void signIn(UnifiedPage page, String user, String password) {
+		page.step("Sign in as " + user, () -> {
+			page.navigate(LoginView.class);
+			page.find(UnifiedLogin.class).login(user, password);
+		});
+	}
 }

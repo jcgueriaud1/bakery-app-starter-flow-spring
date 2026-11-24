@@ -21,9 +21,8 @@ import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
-public class StorefrontViewIT extends AbstractIT<StorefrontViewElement> {
+public class StorefrontViewIT extends AbstractIT {
 
-	@Override
 	protected StorefrontViewElement openView(UnifiedPage page) {
 		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
 		return openLoginView(page).login("admin@vaadin.com", "admin");

@@ -16,11 +16,10 @@ import com.vaadin.testing.unified.TestingTool;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
-public class ProductsViewIT extends AbstractIT<ProductsViewElement> {
+public class ProductsViewIT extends AbstractIT {
 
 	private static Random r = new Random();
 
-	@Override
 	protected ProductsViewElement openView(UnifiedPage page) {
 		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
 		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");
