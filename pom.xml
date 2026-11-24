@@ -150,6 +150,11 @@
         </dependency>
         <dependency>
             <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
             <artifactId>unified-test-browserless</artifactId>
             <scope>test</scope>
         </dependency>

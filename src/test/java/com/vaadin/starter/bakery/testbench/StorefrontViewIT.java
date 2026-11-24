@@ -2,6 +2,7 @@ package com.vaadin.starter.bakery.testbench;
 
 import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
 
+import java.util.Optional;
 import java.util.Random;
 
 import org.junit.jupiter.api.Disabled;
@@ -112,11 +113,12 @@ public class StorefrontViewIT extends AbstractIT {
 	private static void openOrder(UnifiedPage page, int index) {
 		page.step("Open order card " + index, () -> {
 			UnifiedGrid orders = storefront(page).find(UnifiedGrid.class);
-			if (page.hasRealBrowser()) {
-				GridCellTasks.clickInCell(page, "storefront-view", index, 0, "order-card", "wrapper");
-			} else {
-				Order order = (Order) orders.unwrap(Grid.class).getDataCommunicator().getItem(index);
+			Optional<Grid> serverSide = orders.tryUnwrap(Grid.class);
+			if (serverSide.isPresent()) {
+				Order order = (Order) serverSide.get().getDataCommunicator().getItem(index);
 				page.navigate("storefront/" + order.getId());
+			} else {
+				GridCellTasks.clickInCell(page, "storefront-view", index, 0, "order-card", "wrapper");
 			}
 			assertThat(dialog(page)).isOpen();
 		});
