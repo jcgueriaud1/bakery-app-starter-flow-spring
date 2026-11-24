@@ -144,11 +144,6 @@
 
         <!-- Testing -->
         <dependency>
-            <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-testbench-junit6</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
@@ -200,8 +195,10 @@
 
     <profiles>
 
-        <!-- Moving spring-boot start/stop into a separate profile speeds up regular builds.
-             Execute mvn verify -Pit to run integration tests -->
+        <!-- UI tests (*IT, Unified API). Each test class starts the app itself (@UnifiedSpringBootTest).
+             mvn verify -Pit                                   Browserless (default)
+             mvn verify -Pit -Dvaadin.testing.tool=playwright  Playwright
+             mvn verify -Pit -Dvaadin.testing.tool=selenium    Selenium (TestBench license) -->
         <profile>
             <id>it</id>
             <activation>
@@ -211,28 +208,6 @@
             </activation>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>pre-integration-test</id>
-                                <goals>
-                                    <goal>start</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>post-integration-test</id>
-                                <goals>
-                                    <goal>stop</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <wait>1000</wait>
-                            <maxAttempts>180</maxAttempts>
-                        </configuration>
-                    </plugin>
                     <plugin>
                         <artifactId>maven-failsafe-plugin</artifactId>
                         <version>3.5.3</version>
@@ -248,7 +223,6 @@
                             <trimStackTrace>false</trimStackTrace>
                             <enableAssertions>true</enableAssertions>
                             <systemPropertyVariables>
-                                <com.vaadin.testbench.Parameters.runLocally>chrome</com.vaadin.testbench.Parameters.runLocally>
                                 <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/unified-evidence</vaadin.testing.evidence-dir>
                             </systemPropertyVariables>
                         </configuration>

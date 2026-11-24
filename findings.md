@@ -194,3 +194,23 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
   viewport/window size (Playwright and Selenium); the only way is an Escape Hatch per tool, which would make every
   test tool-specific. Dropped it; the tests pass at the default size. Responsive apps will want this.
 
+## F17: `springBootTest: true` silently changes what the other Failsafe profiles test (recipe / docs)
+
+- **Step:** 6
+- The recipe adds the evidence dir to `it-saucelabs` and `it-native` too, but the switch to `@UnifiedSpringBootTest`
+  changes what they mean:
+  - `it-native` ran the `*IT`s against a native executable started outside the build. Now every test class starts
+    the JVM app itself; the native image isn't tested any more, and nothing says so.
+  - `it-saucelabs` passes `com.vaadin.testbench.Parameters.gridBrowsers` / sauce options, which the Unified Selenium
+    adapter doesn't read (there is no remote-grid setting in the configuration page), so these runs would use a local
+    Chrome.
+- The marker only talks about removing `spring-boot:start/stop`. **Suggestion:** a marker on each profile that
+  starts/targets an external server or a remote grid; document remote Selenium grids (or their absence).
+
+## F18: The recipe keeps `vaadin-testbench-junit6`, which is not needed once page objects are gone (info)
+
+- **Step:** 6
+- Correct at the time (page objects still used TestBench), but after resolving the markers, the remaining
+  `TestBenchEscapeHatch` code compiled without it. Nothing tells the user to re-check; a hint in the skill's final step
+  ("remove `vaadin-testbench-*` once no page object is left") would help.
+

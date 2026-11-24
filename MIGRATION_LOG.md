@@ -123,3 +123,32 @@ Other changes:
 - `StorefrontViewIT.editOrder` stays `@Disabled` as before (disabled without a reason in #1431). Rewritten, it
   **passes on all three tools** when the condition is deactivated, so it could be re-enabled.
 - Migration Markers left: **0**.
+
+## Step 5: Wrappers for custom components (none needed)
+
+The plan was to write Wrappers for the custom elements. After step 4 none is needed:
+
+- Everything the tests reach that **is** a Flow component is covered by the Core Set, by `findTemplate(..)` for the
+  7 Lit templates (`@Id` fields with `withId(..)`), or by `findComponent(DashboardCounterLabel.class)`.
+- What's left (Crud's edit pencil, the storefront's `order-card`, the dashboard's `vaadin-board-row`) is markup drawn
+  by a `LitRenderer` or written in a template's HTML: no Flow component, so a `@UnifiedComponent` Wrapper has
+  nothing to bind to, and on Browserless it doesn't exist at all. These stay behind the two documented Escape
+  Hatches (`GridCellTasks`, `DashboardViewIT.checkRowsCount`).
+
+No commit for this step.
+
+## Step 6: Build cleanup
+
+- `it` profile: removed the `spring-boot:start`/`stop` executions (the tests start the app themselves now, as the
+  recipe's marker said) and the `com.vaadin.testbench.Parameters.runLocally` property; documented how to choose the
+  Testing Tool in a comment.
+- Removed `vaadin-testbench-junit6`: the remaining TestBench Escape Hatches (`GridElement`, `$("…")`) compile with
+  what `unified-test-selenium` brings.
+- Removed `rewrite.yml` (one-off migration config; its content is in step 2).
+- Kept the `*IT` names and Failsafe: `mvn test` stays a fast unit-test run, `mvn verify -Pit` runs the UI tests.
+- **Left alone, needs a decision:** `it-saucelabs` (still starts the app with `spring-boot:start` and passes TestBench
+  grid parameters, which the Unified Selenium adapter doesn't read) and `it-native` (meant to test a native executable
+  started outside; `@UnifiedSpringBootTest` now starts the JVM app instead, so the profile no longer tests the native
+  image). Both are probably broken by the move to `@UnifiedSpringBootTest` → [F17](findings.md#f17).
+
+Sanity run `mvn verify -Pit` (Browserless): 17 UI tests, 4 run and pass, 13 skipped (browser-only or `@Disabled`).

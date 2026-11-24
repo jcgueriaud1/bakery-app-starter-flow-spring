@@ -1,7 +1,0 @@
-type: specs.openrewrite.org/v1beta/recipe
-name: com.vaadin.starter.bakery.MigrateTestBench
-recipeList:
-  - org.vaadin.addons.unified.rewrite.MigrateTestBenchToUnified:
-      addPlaywright: true
-      includePageObjects: true
-      addAgentSkill: true
