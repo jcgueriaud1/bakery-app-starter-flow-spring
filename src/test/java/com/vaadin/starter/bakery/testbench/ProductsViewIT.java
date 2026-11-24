@@ -1,136 +1,135 @@
 package com.vaadin.starter.bakery.testbench;
 
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
 import java.util.Random;
 
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.springframework.security.test.context.support.WithUserDetails;
 
-import com.vaadin.flow.component.grid.testbench.GridElement;
-import com.vaadin.flow.component.grid.testbench.GridTHTDElement;
-import com.vaadin.flow.component.textfield.testbench.TextFieldElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.ProductsViewElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.starter.bakery.ui.views.admin.products.ProductsView;
+import com.vaadin.testing.unified.RequiresBrowser;
 import com.vaadin.testing.unified.UnifiedPage;
-import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
+import com.vaadin.testing.unified.component.UnifiedConfirmDialog;
+import com.vaadin.testing.unified.component.UnifiedGrid;
+import com.vaadin.testing.unified.component.UnifiedGrid.UnifiedGridRow;
+import com.vaadin.testing.unified.component.UnifiedTextField;
 
+// Flow's Crud needs a browser (see CrudTasks)
+@RequiresBrowser
+@WithUserDetails("admin@vaadin.com")
 public class ProductsViewIT extends AbstractIT {
 
-	private static Random r = new Random();
+	private static final Random r = new Random();
 
-	protected ProductsViewElement openView(UnifiedPage page) {
-		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
-		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");
-		return storefront.getMenu().navigateToProducts();
+	@Test
+	@DisplayName("An admin renames a new product twice and it keeps its place in the grid")
+	public void editProductTwice(UnifiedPage page) {
+		// given
+		page.navigate(ProductsView.class);
+		UnifiedGrid products = page.find(UnifiedGrid.class);
+		String uniqueName = "Unique cake name " + r.nextInt();
+		createProduct(page, uniqueName, "98.76");
+		int rowNum = productRow(products, uniqueName).getIndex();
+
+		// when
+		String newName = "New " + uniqueName;
+		renameProduct(page, uniqueName, newName);
+
+		// then
+		assertThat(productName(page).visible()).doesNotExist();
+		assertThat(products.row(rowNum)).hasCellText("Product Name", newName);
+
+		// when
+		String newerName = "The " + newName;
+		renameProduct(page, newName, newerName);
+
+		// then
+		assertThat(productName(page).visible()).doesNotExist();
+		assertThat(products.row(rowNum)).hasCellText("Product Name", newerName);
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void editProductTwice(UnifiedPage page) throws Exception {
-		setup(page);
-		ProductsViewElement productsPage = openView(page);
-
+	@DisplayName("An admin changes a product's price, sees it saved, and changes it back")
+	public void editProduct(UnifiedPage page) {
+		// given
+		page.navigate(ProductsView.class);
+		UnifiedGrid products = page.find(UnifiedGrid.class);
 		String uniqueName = "Unique cake name " + r.nextInt();
 		String initialPrice = "98.76";
-		int rowNum = createProduct(page, productsPage, uniqueName, initialPrice);
-		productsPage.openRowForEditing(rowNum);
+		createProduct(page, uniqueName, initialPrice);
 
-		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
-		String newValue = "New " + uniqueName;
-		TextFieldElement nameField = productsPage.getProductName();
-		nameField.setValue(newValue);
+		// when
+		CrudTasks.openForEditing(page, productRow(products, uniqueName));
 
-		productsPage.getCrud().getEditorSaveButton().click();
-		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
-		GridElement grid = productsPage.getCrud().getGrid();
-		Assertions.assertEquals(rowNum, grid.getCell(newValue).getRow());
+		// then
+		assertThat(price(page)).isVisible().hasValue(initialPrice);
 
-		productsPage.openRowForEditing(rowNum);
-		newValue = "The " + newValue;
-		nameField = productsPage.getProductName();
-		nameField.setValue(newValue);
+		// when
+		price(page).setValue("123.45");
+		CrudTasks.saveButton(page).click();
 
-		productsPage.getCrud().getEditorSaveButton().click();
-		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
-		Assertions.assertEquals(rowNum, grid.getCell(newValue).getRow());
-	}
+		// then
+		assertThat(price(page).visible()).doesNotExist();
+		assertThat(page).hasPath("products");
+		assertThat(productRow(products, uniqueName)).hasCellText("Unit Price", "$123.45");
 
-	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void editProduct(UnifiedPage page) throws Exception {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		setup(page);
-		ProductsViewElement productsPage = openView(page);
+		// when
+		CrudTasks.openForEditing(page, productRow(products, uniqueName));
 
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		String url = testBench.getDriver().getCurrentUrl();
-
-		String uniqueName = "Unique cake name " + r.nextInt();
-		String initialPrice = "98.76";
-		int rowIndex = createProduct(page, productsPage, uniqueName, initialPrice);
-
-		productsPage.openRowForEditing(rowIndex);
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		Assertions.assertTrue(testBench.getDriver().getCurrentUrl().length() > url.length());
-
-		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
-
-		TextFieldElement price = productsPage.getPrice();
-		Assertions.assertEquals(initialPrice, price.getValue());
-
-		price.setValue("123.45");
-
-		productsPage.getCrud().getEditorSaveButton().click();
-
-		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
-
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		Assertions.assertTrue(testBench.getDriver().getCurrentUrl().endsWith("products"));
-
-		productsPage.openRowForEditing(rowIndex);
-
-		price = productsPage.getPrice(); // Requery the price element.
-		Assertions.assertEquals("123.45", price.getValue());
+		// then
+		assertThat(price(page)).hasValue("123.45");
 
 		// Return initial value
-		price.setValue(initialPrice);
-
-		productsPage.getCrud().getEditorSaveButton().click();
-		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
+		price(page).setValue(initialPrice);
+		CrudTasks.saveButton(page).click();
+		assertThat(price(page).visible()).doesNotExist();
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void testCancelConfirmationMessage(UnifiedPage page) throws Exception {
-		setup(page);
-		ProductsViewElement productsPage = openView(page);
+	@DisplayName("Cancelling a new product with a name typed in asks to discard the changes")
+	public void testCancelConfirmationMessage(UnifiedPage page) {
+		page.navigate(ProductsView.class);
 
-		productsPage.getCrud().getNewItemButton().get().click();
-		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
-		productsPage.getProductName().setValue("Some name");
-		productsPage.getCrud().getEditorCancelButton().click();
-		Assertions.assertEquals(productsPage.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
+		CrudTasks.newItemButton(page).click();
+		assertThat(productName(page)).isVisible();
+		productName(page).setValue("Some name");
+		CrudTasks.cancelButton(page).click();
+
+		assertThat(page.find(UnifiedConfirmDialog.class).withHeaderTitle("Discard changes")).isOpen();
 	}
 
-	private int createProduct(UnifiedPage page, ProductsViewElement productsPage, String name, String price) {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		productsPage.getSearchBar().getCreateNewButton().click();
-
-		Assertions.assertTrue(productsPage.getCrud().isEditorOpen());
-
-		TextFieldElement nameField = productsPage.getProductName();
-		TextFieldElement priceField = productsPage.getPrice();
-
-		nameField.setValue(name);
-		priceField.setValue(price);
-
-		productsPage.getCrud().getEditorSaveButton().click();
-		Assertions.assertFalse(productsPage.getCrud().isEditorOpen());
-
-		// TODO unified: TestBench Escape Hatch: waitUntil((ExpectedCondition<GridTHTDElement>) wd -> productsPage.getCrud().getGrid().getCell(name))
-		return testBench.waitUntil((ExpectedCondition<GridTHTDElement>) wd -> productsPage.getCrud().getGrid().getCell(name)).getRow();
+	private static UnifiedTextField productName(UnifiedPage page) {
+		return page.find(UnifiedTextField.class).withLabel("Product name");
 	}
 
+	private static UnifiedTextField price(UnifiedPage page) {
+		return page.find(UnifiedTextField.class).withLabel("Unit price");
+	}
+
+	private static UnifiedGridRow productRow(UnifiedGrid products, String name) {
+		return products.row().withCellText("Product Name", name);
+	}
+
+	private static void createProduct(UnifiedPage page, String name, String price) {
+		page.step("Create product " + name, () -> {
+			CrudTasks.newItemButton(page).click();
+			productName(page).setValue(name);
+			price(page).setValue(price);
+			CrudTasks.saveButton(page).click();
+			assertThat(productName(page).visible()).doesNotExist();
+			assertThat(page.find(UnifiedGrid.class).row().withCellText("Product Name", name)).exists();
+		});
+	}
+
+	private static void renameProduct(UnifiedPage page, String name, String newName) {
+		page.step("Rename product " + name + " to " + newName, () -> {
+			CrudTasks.openForEditing(page, productRow(page.find(UnifiedGrid.class), name));
+			// the editor shows the product once the server has loaded it; typing earlier gets overwritten
+			assertThat(productName(page)).isVisible().hasValue(name);
+			productName(page).setValue(newName);
+			CrudTasks.saveButton(page).click();
+		});
+	}
 }

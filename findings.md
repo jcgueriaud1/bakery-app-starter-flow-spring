@@ -97,3 +97,53 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
   no extra setup, and `page.findTemplate(DashboardView.class).findComponent(DashboardCounterLabel.class)` with
   `hasCount(4)` passes on Browserless, Playwright and Selenium. The test used to need a real browser + login form.
 
+## F9: Flow's `Crud` has no Wrapper and can't be driven on Browserless (api, gap)
+
+- **Step:** 4 (`ProductsViewIT`, `UsersViewIT`)
+- Bakery's Products and Users views are `Crud`s (grid + editor). The Core Set has no `UnifiedCrud`, the TestBench
+  recipe leaves `CrudElement` untouched, and neither the docs nor the *Known limitations* page mention `Crud`.
+- On Browserless the Crud's Save / Cancel / Delete buttons are Flow `Button`s **without text** (the web component
+  sets it from the i18n in the browser): the Findable View shows `button (no name)  not unique: 4 alike`. Found by
+  `withAttribute("slot", "save-button")`, clicking them **does nothing**: the save/cancel/delete are DOM events the
+  `vaadin-crud` web component fires to the server. The confirm dialog (`Discard changes`) never opens either.
+- The edit button (pencil) is rendered by `Crud.addEditColumn` (a `LitRenderer`, no Flow component) in a column
+  **without a header**, and `UnifiedGridRow.cell(..)` only takes a header → not reachable with the Unified API even
+  in a browser. Wrote a helper that clicks it through Dramafinder (`GridElement.findCell(row, col)`) or TestBench
+  (`GridElement.getCell(row, col)`), picked with `page.tryUnwrap(Page.class)`.
+- Browserless Test itself has no `CrudTester` either.
+- **Result:** all Products and Users tests are `@RequiresBrowser` (Playwright + Selenium).
+- **Suggestions:** a `UnifiedCrud` (editor open/closed, `edit(row)`, `save()`, `cancel()`, `delete()`, the two confirm
+  dialogs) with Browserless support that fires the Crud's events; `UnifiedGridRow.cell(int columnIndex)`; list
+  `Crud` under the known gaps.
+
+## F10: An Escape Hatch action on Playwright doesn't wait for the server, and the next Unified action doesn't either (bug-ish / docs)
+
+- **Step:** 4 (`ProductsViewIT.editProductTwice`, Playwright only, deterministic)
+- Sequence: Playwright click on the Crud's pencil (Escape Hatch) → `assertThat(nameField).isVisible()` passes at
+  once (the editor opens client-side) → `nameField.setValue("New …")` → `save`. The server's answer to the edit
+  (load entity, navigate to `products/{id}`, `binder.readBean`) lands **after** `setValue` and puts the old name back,
+  so Save stores the old name. The test fails on Playwright, passes on Selenium (TestBench's click waits for Vaadin),
+  and passes on Playwright with `-Dvaadin.testing.user-steps.snapshots=true` (slower steps) – a heisenbug.
+- The skill/docs say Escape Hatch code *“gets none of the Unified API's waiting”*, but they imply the next Unified
+  action waits for the server again (Auto-Wait). Here `setValue` did not wait for the round trip the Escape Hatch
+  started.
+- Worked around with `assertThat(name).hasValue(<current name>)` before typing (a meaningful check anyway).
+- **Suggestions:** make the Playwright adapter's actions wait for Vaadin's idle state before acting (not only after),
+  or offer `page.waitForServer()` for Escape Hatch code; mention this pitfall next to the Escape Hatch docs.
+
+## F11: `assertThat(page).hasPath(..)` is exact only; no way to read the current path (api, minor)
+
+- **Step:** 4 (`ProductsViewIT.editProduct`)
+- The old test checked that opening a row put the item's id in the URL (`currentUrl.length() > before`). The id is
+  unknown to the test, `hasPath` compares the whole path, and `UnifiedPage` has no `getPath()`. The check was dropped;
+  `isAt(ProductsView.class)` can't tell `products` from `products/42`.
+- **Suggestion:** `hasPathStartingWith(..)` / `hasPathMatching(regex)` or a `currentPath()` read.
+
+## F12: Small report / Findable View wording issues (info)
+
+- A User Step for a `page.step("Edit " + row, ..)` reads `Edit row().withCellText("Product Name", "…")`: a grid row's
+  `toString()` is code, not words like the built-in steps (`row where Product Name is “…”`).
+- Before the template was entered, the Findable View printed
+  `page.findTemplate(<the class with @Tag("search-bar")>.class)` instead of `SearchBar.class` (it printed the real
+  class name in the same run after the first `findTemplate(SearchBar.class)` call).
+
