@@ -4,7 +4,9 @@ Project: Bakery App Starter (Flow + Spring), branch `unified-testing-tool-alpha5
 Tool: `org.vaadin.addons:unified-test-*:0.1.0-alpha5` (Maven Central / local repo), docs from the `unified-test-0.1.0-alpha5` tag.
 Environment: macOS, JDK 25 (target 21), Maven, Chrome, TestBench license present. Vaadin 25.3.6, Spring Boot 4.1.3.
 
-Each step below is one commit. Issues found along the way are in [findings.md](findings.md).
+Each step below is one commit. Issues found along the way are in [findings.md](findings.md), filed upstream as
+[parttio/unified-testing-tool#602](https://github.com/parttio/unified-testing-tool/issues/602) (sub-issues #603–#610).
+Migration PR (draft): https://github.com/jcgueriaud1/bakery-app-starter-flow-spring/pull/2
 The `unified-testing-tool-alpha4` branch was deliberately **not** looked at until the final comparison.
 
 ## Step 0: Baseline (TestBench, before migration)

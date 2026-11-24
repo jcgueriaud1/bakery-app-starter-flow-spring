@@ -4,6 +4,10 @@ Issues, surprises and suggestions found while migrating the Bakery TestBench tes
 Severity: **bug** (wrong behaviour), **recipe** (migration recipe missed / produced wrong code), **docs**, **api** (friction / missing feature), **info**.
 The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
 
+Migration PR (draft): https://github.com/jcgueriaud1/bakery-app-starter-flow-spring/pull/2
+
+Filed upstream as [parttio/unified-testing-tool#602](https://github.com/parttio/unified-testing-tool/issues/602) and its sub-issues: F13 → #603; F10 → #604; F6 → #605; F1, F3, F4, F5, F18 (+ pom ordering) → #606; F2, F17 → #607; F9 (generic part) → #608; F7, F12 (Findable View part), F15 → #609; F11, F12 (step text), F14 → #610. F16 is covered by #489 / #496; a Crud Core Set Wrapper was declined earlier (#532, `.out-of-scope/crud-wrapper.md`), so #608 asks only for the generic grid parts. F8 is a positive note.
+
 **18 findings: 4 High, 4 Medium, 9 Low, 1 positive.** The ones that limit the result most are F9 (Flow `Crud` can't
 be tested on Browserless and has no Wrapper) and F13 (on Browserless, `UnifiedLink` lookups crash on pages with a
 `Text`). F10 is the nastiest: a Playwright-only race that saves the wrong data, and it disappears when snapshots are on.
