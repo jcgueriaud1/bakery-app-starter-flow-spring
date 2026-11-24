@@ -19,3 +19,27 @@ Command: `mvn -B verify -Pit` (Spring Boot started by the `it` profile on :8080,
 | Classes | `DashboardViewIT` (2), `LoginIT` (4), `ProductsViewIT` (3), `StorefrontViewIT` (3), `UsersViewIT` (5); TestBench runs classes in parallel (~8–20 s each) |
 
 Test code: 6 test classes (incl. `AbstractIT`), 16 page objects / custom elements (`elements/ui`, `elements/components`), 944 lines.
+
+## Step 1: Dry run (`FindTestClassesToMigrate`)
+
+```bash
+mvn -U org.openrewrite.maven:rewrite-maven-plugin:6.46.1:dryRun \
+  -Drewrite.recipeArtifactCoordinates=org.vaadin.addons:unified-test-rewrite:0.1.0-alpha5 \
+  -Drewrite.activeRecipes=org.vaadin.addons.unified.rewrite.FindTestClassesToMigrate \
+  -Drewrite.exportDatatables=true
+```
+
+10 s, no errors. Result (`FindTestClassesToMigrate$TestClasses.csv`):
+
+| Class | Status | Page objects | Annotation |
+|---|---|---|---|
+| `AbstractIT` | migrates | – | `@UnifiedSpringBootTest` (option `springBootTest` decides) |
+| `DashboardViewIT`, `LoginIT`, `ProductsViewIT`, `StorefrontViewIT`, `UsersViewIT` | migrates | – | – |
+
+Every class is reported as `migrates`, and the `pageObjects` column is empty, although every test goes through
+custom elements (`LoginViewElement extends LoginOverlayElement`, `OrderCardElement` `@Element("order-card")`, …),
+which the docs say are listed and make a class `migrates partly` → [F1](findings.md#f1).
+
+Notable for the next step: the app has 7 `LitTemplate`s (`storefront-view`, `dashboard-view`, `search-bar`,
+`order-editor`, `order-details`, `order-item-editor`, `dashboard-counter-label`), and alpha5 is the first release
+whose recipe enters Templates (`findTemplate`).
