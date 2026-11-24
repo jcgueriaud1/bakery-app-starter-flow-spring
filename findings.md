@@ -147,3 +147,31 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
   `page.findTemplate(<the class with @Tag("search-bar")>.class)` instead of `SearchBar.class` (it printed the real
   class name in the same run after the first `findTemplate(SearchBar.class)` call).
 
+## F13: On Browserless, `page.find(UnifiedLink.class)` throws when the page holds a Flow `Text` component (bug, high)
+
+- **Step:** 4 (`UsersViewIT.accessDenied`)
+- `page.find(UnifiedLink.class).all()` → `UnsupportedOperationException` at
+  `AbstractTextElementStateProvider.getTag` ← `Element.getTag` ← `BrowserlessSession.hasQueriedTag(BrowserlessSession.java:307)`.
+  `hasQueriedTag` (new in alpha5, for `@UnifiedComponent(value = Component.class, tag = "a")`) calls
+  `c.getElement().getTag()` on every component, and a `Text` component's element is a text node, which has no tag.
+- Bakery's menu (`RouterLink` with an icon and `a.add(title)` → `Text`) and its 404 view (`new Text("Oops …")`) both hit it.
+  `HasComponents.add(String)` creates a `Text`, so most apps will.
+- **Symptoms:** inside an assertion the exception is swallowed: `assertThat(link).exists()` fails after 10 s with only
+  `Expected link “Go to the front page.” to exist` – no `Found`, no `Nearby`, no cause. The Findable View silently
+  leaves **every** link out on Browserless (on Playwright it lists them), so `Did you mean` can't help either.
+- **Fix:** skip text nodes (`c.getElement().isTextNode()`) in `hasQueriedTag`; and let a lookup's unexpected exception
+  surface as the cause of the `UnifiedAssertionError` instead of a timeout.
+- **Workaround used:** `assertThat(page).hasTitle("Page was not found")` and
+  `page.findComponent(RouterLink.class).withText("Go to the front page.")` (a class with its own `@Tag` skips the tag check).
+- **Repro (Browserless):** a view with `add(new Text("x"), new RouterLink("Home", HomeView.class))`, then
+  `page.find(UnifiedLink.class).withText("Home").click()`.
+
+## F14: The default Crud/confirm-dialog lookups need `.visible()` everywhere (info)
+
+- **Step:** 4
+- In a browser, `page.find(UnifiedButton.class).withText("Cancel")` matched 4 buttons (the Crud editor's and the
+  hidden buttons of the Crud's two confirm dialogs and of the main layout's `ConfirmDialog`), as did
+  `UnifiedConfirmDialog` without a header filter. The failure message (`Found 4: button “Cancel”, …`) doesn't say
+  which are hidden, while the Findable View does (`(hidden)`). Adding `(hidden)` to the `Found` list would point
+  straight at `.visible()`.
+
