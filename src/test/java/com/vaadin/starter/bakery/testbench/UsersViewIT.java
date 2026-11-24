@@ -161,9 +161,7 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		StorefrontViewElement storefront = openLoginView(page).login("barista@vaadin.com", "barista");
 		Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
 
-		// TODO unified: navigation to APP_URL + "users": not a local application URL the recipe can read; use page.navigate("<path>")
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		testBench.getDriver().get(APP_URL + "users");
+		page.navigate("users");
 		// TODO unified: TestBench Escape Hatch: $("vaadin-app-layout > div > a")
 		TestBenchElement link404 = testBench.$("vaadin-app-layout > div > a").waitForFirst();
 

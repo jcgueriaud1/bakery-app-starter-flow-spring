@@ -17,3 +17,46 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
   through the return types of page-object methods.
 - **Impact:** the dry run overstates how much will migrate; a user can't plan the Wrapper work from it.
 
+## F2: Hard-coded `:8080` base URL survives the switch to `@UnifiedSpringBootTest` (recipe)
+
+- **Step:** 2
+- `AbstractIT` had `public String APP_URL = "http://localhost:8080/"` (non-final, reassigned to the site-local IP when not
+  running locally) and `openLoginView(driver, url)` doing `driver.get(url)`.
+- The recipe makes the class `@UnifiedSpringBootTest` (app on a **random port**) but keeps `driver.get(url)` in
+  `openLoginView` through the Escape Hatch **without a Migration Marker**. Only the two `getDriver().get(APP_URL + "x")`
+  in tests got the *“not a local application URL”* marker.
+- **Impact:** silent wrong-server testing. Because the `it` profile still runs `spring-boot:start` on :8080, the migrated
+  tests would have passed while testing the *old* server, not the app the test started (and fail with
+  connection refused once the profile is cleaned up as the marker suggests).
+- **Suggestion:** when the class becomes `@UnifiedSpringBootTest`, flag every `WebDriver.get(..)` / field holding
+  `localhost:8080`, not just constant-concatenation call sites; ideally rewrite `driver.get(url)` with a String
+  parameter to `page.navigate(path)`.
+
+## F3: No Migration Marker on calls into custom elements / page objects (recipe)
+
+- **Step:** 2
+- Docs (*What it leaves for you*) list the marker `TestBench page object: LoginViewElement (custom element extending
+  LoginOverlayElement): write a Wrapper or convert the page object` and say *“Each statement calling one gets a
+  Migration Marker”*.
+- **Actual:** not a single statement calling `productsPage.getCrud()…`, `storefrontPage.getOrderCard(..)`,
+  `loginView.login(..)` etc. got that marker; only the class-level `@RequiresTestingTool(SELENIUM)` shows it. 17 tests'
+  worth of TestBench code is invisible to `grep "TODO unified"`, so the `resolve-migration-markers` skill (which works
+  marker-by-marker) would miss most of the work.
+- Related to [F1](#f1): the same blind spot in the dry run.
+
+## F4: Recipe emits `testBench.getRunLocallyBrowser()`, which doesn't compile (recipe)
+
+- **Step:** 2
+- `if (getRunLocallyBrowser() == null)` in the old `@BeforeEach` became
+  `testBench.getRunLocallyBrowser()` with an *Escape Hatch* marker; `TestBenchEscapeHatch` has no such method →
+  compilation error. The only compile error of the run.
+- **Suggestion:** either expose it on the Escape Hatch or treat it like `@RunLocally` (*“browser setup removed”* marker).
+
+## F5: Login marker on a statement that doesn't sign in (recipe, minor)
+
+- **Step:** 2
+- `LoginIT.loginWorks`: `Assertions.assertEquals("Email", loginView.getUsernameLabel())` got
+  *“signs in through the login form: … consider @WithMockUser”* – any statement calling a method on the login element is
+  marked, not only the one that submits. Also, it's a `LoginIT`: every test there checks the login itself, so
+  `@WithMockUser` advice is noise for that class.
+

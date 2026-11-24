@@ -43,3 +43,48 @@ which the docs say are listed and make a class `migrates partly` → [F1](findin
 Notable for the next step: the app has 7 `LitTemplate`s (`storefront-view`, `dashboard-view`, `search-bar`,
 `order-editor`, `order-details`, `order-item-editor`, `dashboard-counter-label`), and alpha5 is the first release
 whose recipe enters Templates (`findTemplate`).
+
+## Step 2: Run the recipe (`MigrateTestBenchToUnified`)
+
+`rewrite.yml` with `addPlaywright: true`, `includePageObjects: true`, `addAgentSkill: true`; `rewrite-maven-plugin:6.46.1:run`. 14 s.
+The output is committed **unchanged** (commit "Step 2: raw output…") so it can be diffed.
+
+What it did:
+
+- **pom.xml:** imports `unified-test-bom:0.1.0-alpha5`; adds `unified-test-spring`, `-browserless`, `-playwright`,
+  `-selenium`, `browserless-test-spring`, `spring-boot-starter-security-test`; `vaadin-testbench-junit5` →
+  `vaadin-testbench-junit6` (kept, since page objects stay TestBench); adds `vaadin.testing.evidence-dir` to all three
+  Failsafe configurations (`it`, `it-saucelabs`, `it-native`). The `spring-boot:start/stop` executions are left alone (as documented).
+- **Agent files:** `.claude/skills/resolve-migration-markers/SKILL.md`, `.claude/skills/write-unified-ui-tests/SKILL.md`, `AGENTS.md`.
+- **Tests:** `AbstractIT` loses `extends BrowserTestBase`, gains `@UnifiedSpringBootTest`; `@BrowserTest` → `@Test` with a
+  `UnifiedPage page` parameter; `@BeforeEach setup()` → explicit `setup(page)` at the start of every test; helpers take the page.
+- **Page objects (16 classes): untouched**, despite `includePageObjects` – they are all custom elements (`@Element`,
+  `extends LoginOverlayElement`, …), which the docs say stay TestBench.
+
+Result in numbers:
+
+| | |
+|---|---|
+| Tests | 17, **all 17 `@RequiresTestingTool(SELENIUM)`** – none runs on Browserless or Playwright |
+| Migration Markers | 30: 18 *TestBench Escape Hatch*, 9 *signs in through the login form*, 2 *navigation to `APP_URL + …`*, 1 *tests now start the app themselves* |
+| Unified API lookups (`page.find`) produced | 0 – every lookup in Bakery lives in a page object |
+| Compiles? | No – 1 error (`TestBenchEscapeHatch.getRunLocallyBrowser()` doesn't exist) → [F4](findings.md#f4) |
+
+Other observations → [F2](findings.md#f2) (hard-coded `:8080` base URL silently kept),
+[F3](findings.md#f3) (no Migration Marker on any page object / custom element call),
+[F5](findings.md#f5) (login marker on a line that doesn't sign in).
+
+## Step 3: Compile and run (Selenium only)
+
+Smallest change to compile and to target the right server:
+
+- removed `APP_URL` (`http://localhost:8080/` or the site-local IP) and the `getRunLocallyBrowser()` branch; the
+  Unified API owns the browser and the base URL;
+- `openLoginView(page, driver, url)` → `openLoginView(page, path)` using `page.navigate(path)`;
+- the two `getDriver().get(APP_URL + "...")` → `page.navigate("login")` / `page.navigate("users")`.
+
+`mvn verify -Pit -Dvaadin.testing.tool=selenium`: **17 run, 16 pass, 1 skipped (`@Disabled`)**, 32 s wall-clock.
+`summary.md`: *“14 passing scenarios end in Escape Hatch code, whose checks the report can't see”*.
+On Browserless / Playwright every test is skipped (`@RequiresTestingTool(SELENIUM)`).
+
+Note: the `it` profile still starts a second app on :8080 that nobody uses now (cleaned up in step 6).

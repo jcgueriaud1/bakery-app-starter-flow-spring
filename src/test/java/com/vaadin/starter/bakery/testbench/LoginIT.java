@@ -40,10 +40,8 @@ public class LoginIT extends AbstractIT<LoginViewElement> {
 	@Test
 	@RequiresTestingTool(TestingTool.SELENIUM)
 	public void loginToNotDefaultUrl(UnifiedPage page) throws Exception {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
 		setup(page);
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		LoginViewElement loginView = openLoginView(page, testBench.getDriver(), APP_URL + "dashboard");
+		LoginViewElement loginView = openLoginView(page, "dashboard");
 		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
 		DashboardViewElement dashboard = loginView.login("admin@vaadin.com", "admin", DashboardViewElement.class);
 		Assertions.assertNotNull(dashboard);
@@ -56,9 +54,7 @@ public class LoginIT extends AbstractIT<LoginViewElement> {
 		setup(page);
 		loginToNotDefaultUrl(page);
 		// Navigating to /login after user is logged in will forward to storefront view
-		// TODO unified: navigation to APP_URL + "login": not a local application URL the recipe can read; use page.navigate("<path>")
-		// TODO unified: TestBench Escape Hatch: getDriver()
-		testBench.getDriver().get(APP_URL + "login");
+		page.navigate("login");
 		// TODO unified: TestBench Escape Hatch: $(StorefrontViewElement.class)
 		testBench.$(StorefrontViewElement.class).onPage().waitForFirst();
 		// TODO unified: TestBench Escape Hatch: $(LoginViewElement.class)
