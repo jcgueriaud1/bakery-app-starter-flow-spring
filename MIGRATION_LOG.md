@@ -191,3 +191,102 @@ twin in `StorefrontViewIT.openOrder`, and `DashboardViewIT.checkRowsCount`. Each
 
 Code size: test code went from 944 lines (6 classes + 16 page objects) to 703 lines (5 test classes, `AbstractIT`, `CrudTasks`, `GridCellTasks`, `UnifiedStyleTest`; no page
 objects): `git diff --stat e927b3c -- src/test` gives 26 files, +564 −807.
+
+## Step 8: Comparison, alpha4 vs alpha5
+
+Only now did I read the `unified-testing-tool-alpha4` branch (its `MIGRATION_LOG.md`, `findings.md` and final code).
+I also ran its final suite once per tool on this machine, right after the alpha5 runs, for comparable times.
+
+### Result
+
+| | alpha4 branch (final) | **alpha5 branch (final)** |
+|---|---|---|
+| UI tests passing on **Browserless** | 2 | **4** |
+| UI tests passing on **Playwright** | 5 | **15** |
+| UI tests passing on **Selenium** | 16 | 16 |
+| Tests that need TestBench (Selenium-only) | 11 | **1** (`checkRowsCount`, shadow-DOM layout check) |
+| Tests that run on all 3 tools | 2 (`accessDenied`, `openLoginAfterLoggedIn`) | **4** (`checkCounters`, `testDialogs`, `testTextFieldValidation`, `accessDenied`) |
+| `@Disabled editOrder` if enabled | not tried | passes on all 3 |
+| TestBench page objects left | 15 files, 345 lines | **0** |
+| Custom Wrappers written | 3 (`UnifiedCrud`, `UnifiedEmailField`, `UnifiedPasswordField`) | 0 (Email/Password/Login/ConfirmDialog are in the Core Set now) |
+| `TestBenchEscapeHatch.of(..)` in tests | 8 | 2 (both in documented helpers) |
+| JUnit `assert*` / retrying `assertThat(..)` | 37 / 20 | 1 / 50 |
+| `@RequiresTestingTool(SELENIUM)` / `@RequiresBrowser` | 7 / 3 | 1 / 7 (class-level on Login, Products; per test on Users) |
+| Sign-in | `@WithMockUser(username, roles)` | `@WithUserDetails` (the app's own `UserDetailsService`) |
+| Style rules | pass | pass |
+
+### Speed (same machine, same day, `mvn -B verify -Pit`, whole build)
+
+| | TestBench baseline | alpha4 suite | alpha5 suite |
+|---|---|---|---|
+| Browserless | – | 33 s¹ (2 tests) | 17–18 s (4 tests) |
+| Playwright | – | 20 s (5 tests) | 37–38 s (15 tests) |
+| Selenium | 43–51 s (16 tests) | 30 s (16 tests) | 40–41 s (16 tests) |
+| Sum of test-class times on Selenium | ~20 s per class in parallel | 22.7 s | 30.0 s |
+
+¹ First build after switching branches: the alpha4 branch commits its own `package.json`/`vite.config.ts`, so the
+frontend was rebuilt. Its 12–14 s in its own log is the steady value.
+
+On Selenium the alpha5 suite is about 30% slower than alpha4's, though both run the same 16 tests. The time goes
+into what alpha5's tests do on top: about 2.5× as many retrying checks, waiting for the editor to show the loaded
+value before typing (the fix for F10), and opening order cards in the Storefront tests through the real grid instead
+of page objects. Both Unified suites are faster than the TestBench baseline. The alpha5 suite was green in every run
+(2 rounds × 3 tools + the per-class runs). alpha4 also reported its TestBench baseline as flaky (Chrome failing to
+start in parallel); I didn't see that in my 3 baseline runs.
+
+### The migration itself
+
+| | alpha4 | alpha5 |
+|---|---|---|
+| Recipe output compiles? | No: 5 kinds of error (F3, F4 there), incl. removed element jars | **1 error** (`getRunLocallyBrowser()`) |
+| Migration Markers from the recipe | 8 | 30 (login, navigation, Escape Hatches, the server switch) |
+| Spring Boot app tested against `spring-boot:start` | silently `@UnifiedUITest`, no marker | `@UnifiedSpringBootTest` + a marker (ADR 0013); `APP_URL` driver navigation in the base class still unmarked (F2) |
+| Page objects | not converted, not marked, tests not annotated | not converted, not marked, **but** every test gets `@RequiresTestingTool(SELENIUM)` |
+| Evidence dir for Failsafe | under `surefire-reports` | own `failsafe-reports/unified-evidence` |
+| `@WithMockUser` dependency | had to be added by hand | added by the recipe |
+| Time, wall clock | ≈ 37 min + a manual skill start | ≈ 47 min (12:58 → 13:45), no manual step |
+| Where the time went | making it compile, then finding out what the API can't see | exploring templates and Crud with `describe()`, then rewriting every class (the page objects held all the logic) |
+
+### alpha4 findings, re-checked on alpha5
+
+| alpha4 finding | Status in alpha5 |
+|---|---|
+| F1 dry run silent about page objects | **Still there** → alpha5 F1 |
+| F3 build drops element jars still used | **Fixed** (keeps `vaadin-testbench-junit6`; now even more than needed, F18) |
+| F4 output doesn't compile | **Mostly fixed**: 1 new error (F4) |
+| F5 page objects neither converted nor marked | **Partly fixed**: tests now get `@RequiresTestingTool(SELENIUM)`, statements still get no marker (F3) |
+| F6 external-server Spring Boot app silently `@UnifiedUITest` | **Fixed** (ADR 0013, marker). `APP_URL` in a helper still slips through (F2) |
+| F7 pom rewrite interleaves test deps with runtime ones | **Still there**: `browserless-test-spring` was inserted at the top, among the runtime dependencies |
+| F8 evidence under `surefire-reports`; root navigation reads `open “”` | **Fixed** (failsafe dir; reads `open “/”`). "Scenarios without a check" after migration still noisy until the markers are resolved |
+| F9 nothing inside a LitTemplate can be found | **Fixed**: `findTemplate(..)`, nested, on all three tools. The biggest gain for Bakery |
+| F10 Selenium route templates / `isAt` on `@RouteAlias` | **Not hit**: `isAt(StorefrontView.class)` on `/` passes on Selenium |
+| F11/F12 `selectTab(..)` on a menu tab that navigates | **Fixed**: `selectTab("Dashboard"/"Users"/"Storefront"/"Logout")` works on all three tools |
+| F13 Core Set gaps (Login, ConfirmDialog, Email, Password, Crud) | **Mostly fixed**: all but `Crud` (F9) |
+| F14 skill proof runs 0 UI tests | **Fixed** in the skill text (Failsafe aware, "0 tests = failed proof") |
+| F15 `withTimeout` loses the type | Fixed per release notes (not used here) |
+| F16 security test dependency undocumented | **Fixed** (recipe adds it, guide documents it) |
+| F17 `.visible()` on a confirm dialog differs PW vs Selenium | **Not hit**: `page.find(UnifiedConfirmDialog.class).visible().confirm()` passes on both |
+| F18 migration output fails the style rules | Not comparable: I rewrote all code. My own first version had 3 violations, fixed with `tryUnwrap` |
+
+New in alpha5 (not in alpha4's list): **F13** (Browserless `UnifiedLink` crash, a regression from alpha5's new tag
+matching), **F10** (Playwright Escape Hatch race), **F6** (secret masking), **F7**/**F15** (template visibility
+limits), **F17** (other Failsafe profiles).
+
+### Verdict
+
+alpha5 fixed exactly what limited the alpha4 result: LitTemplate `@Id` components (`findTemplate`) and the missing
+Core Set Wrappers (Login, ConfirmDialog, Email/Password). On the same app, that took the suite from **5 to 15 tests
+without TestBench** and **from 2 to 4 tests without a browser**, and let me delete every page object. The recipe is
+close to compiling out of the box now (1 error instead of a list) and handles the "server started by the build" layout
+properly.
+
+What still caps Bakery:
+
+1. **Flow `Crud`** (7 tests browser-only, plus a per-tool helper for the edit pencil): no Wrapper, no Browserless support.
+2. **Renderer-drawn content in grid cells** (Crud pencil, order cards): unreachable from the Unified API; a
+   `row.cell(int)` and a way to fire a `LitRenderer` function on Browserless would remove the last helper.
+3. **The recipe still ignores `TestBenchElement` page objects**, so on a page-object suite the recipe does the
+   plumbing and a person or agent rewrites every test.
+
+Bugs to fix before beta: **F13** (Browserless link lookups crash on any `Text`, a regression), **F10** (Playwright
+Escape Hatch race → silently wrong data) and **F6** (secret masking mangles reports).

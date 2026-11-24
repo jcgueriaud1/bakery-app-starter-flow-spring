@@ -4,6 +4,34 @@ Issues, surprises and suggestions found while migrating the Bakery TestBench tes
 Severity: **bug** (wrong behaviour), **recipe** (migration recipe missed / produced wrong code), **docs**, **api** (friction / missing feature), **info**.
 The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
 
+**18 findings: 4 High, 4 Medium, 9 Low, 1 positive.** The ones that limit the result most are F9 (Flow `Crud` can't
+be tested on Browserless and has no Wrapper) and F13 (on Browserless, `UnifiedLink` lookups crash on pages with a
+`Text`). F10 is the nastiest: a Playwright-only race that saves the wrong data, and it disappears when snapshots are on.
+alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-comparison-alpha4-vs-alpha5).
+
+| # | Severity | Area | Summary |
+|---|---|---|---|
+| F1 | Low | Dry run | `FindTestClassesToMigrate` lists no page objects and says `migrates` for classes that end up Selenium-only |
+| F2 | **High** | Recipe | `:8080` `APP_URL` navigation in a base-class helper is kept, unmarked, after the switch to `@UnifiedSpringBootTest`, so the tests can silently hit the old server |
+| F3 | Medium | Recipe | No Migration Marker on any call into a custom element / page object (only class-level `@RequiresTestingTool`) |
+| F4 | Low | Recipe | Emits `TestBenchEscapeHatch.getRunLocallyBrowser()`, which doesn't exist (the only compile error) |
+| F5 | Low | Recipe | Login marker on a statement that doesn't sign in, and in a class that tests the login itself |
+| F6 | Medium | Reports | The password secret is masked as a plain string everywhere: user name and `@DisplayName` become `••••` |
+| F7 | Low | API | Plain HTML in a template's shadow DOM is unreachable even in a browser; `findDescendants` doesn't pierce |
+| F8 | ✔ | API | `@WithUserDetails` + `findTemplate(..).findComponent(..)` work on all three tools (positive) |
+| F9 | **High** | Core Set / Browserless | Flow `Crud`: no Wrapper; on Browserless its buttons have no text and clicking them does nothing; its edit column has no header, so no `row.cell(..)` |
+| F10 | **High** | Playwright adapter | An Escape Hatch click doesn't wait for the server and the next Unified action doesn't either: the old value overwrites typed text, the wrong data is saved; a heisenbug |
+| F11 | Low | API | `hasPath` exact only; no current-path read |
+| F12 | Low | Reports | Step text for a grid row is code; Findable View prints `<the class with @Tag(..)>` before first use |
+| F13 | **High** | Browserless adapter | `page.find(UnifiedLink.class)` throws on any page with a Flow `Text` (alpha5 tag matching); hidden behind a timeout, links missing from the Findable View |
+| F14 | Low | Reports | `Found 4: button “Cancel”, …` doesn't say which are hidden |
+| F15 | Medium | Findable View | Inside a Template, `@Id` components without Java-set text are `not unique: N alike` instead of `withId(..)` |
+| F16 | Low | Config | No window/viewport size setting |
+| F17 | Medium | Recipe / docs | `@UnifiedSpringBootTest` silently changes what `it-native` / `it-saucelabs` test; no remote-grid setting |
+| F18 | Low | Recipe / skill | `vaadin-testbench-junit6` kept though not needed after the markers are resolved |
+
+## Details
+
 ## F1: `FindTestClassesToMigrate` reports no page objects and no "migrates partly" (recipe)
 
 - **Step:** 1 (dry run)
