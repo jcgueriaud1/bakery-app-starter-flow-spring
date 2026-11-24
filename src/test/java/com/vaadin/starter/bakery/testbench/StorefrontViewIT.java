@@ -1,142 +1,148 @@
 package com.vaadin.starter.bakery.testbench;
 
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
 import java.util.Random;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.test.context.support.WithUserDetails;
 
-import com.vaadin.flow.component.button.testbench.ButtonElement;
-import com.vaadin.flow.component.notification.testbench.NotificationElement;
-import com.vaadin.flow.component.textfield.testbench.TextFieldElement;
-import com.vaadin.starter.bakery.testbench.elements.components.OrderCardElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.OrderItemEditorElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement.OrderEditorElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
-import com.vaadin.testing.unified.RequiresTestingTool;
-import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.starter.bakery.backend.data.entity.Order;
+import com.vaadin.starter.bakery.ui.components.SearchBar;
+import com.vaadin.starter.bakery.ui.views.orderedit.OrderDetails;
+import com.vaadin.starter.bakery.ui.views.orderedit.OrderEditor;
+import com.vaadin.starter.bakery.ui.views.orderedit.OrderItemEditor;
+import com.vaadin.starter.bakery.ui.views.storefront.StorefrontView;
 import com.vaadin.testing.unified.UnifiedPage;
-import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
+import com.vaadin.testing.unified.component.UnifiedButton;
+import com.vaadin.testing.unified.component.UnifiedDialog;
+import com.vaadin.testing.unified.component.UnifiedGrid;
+import com.vaadin.testing.unified.component.UnifiedIntegerField;
+import com.vaadin.testing.unified.component.UnifiedNotification;
+import com.vaadin.testing.unified.component.UnifiedTabs;
+import com.vaadin.testing.unified.component.UnifiedTemplate;
+import com.vaadin.testing.unified.component.UnifiedTextField;
 
+/*
+ * The storefront, its dialog and the order editor/details are LitTemplates: their components are found by entering
+ * each template, by @Id where the text is written in the template's HTML (empty on Browserless).
+ */
+@WithUserDetails("admin@vaadin.com")
 public class StorefrontViewIT extends AbstractIT {
-
-	protected StorefrontViewElement openView(UnifiedPage page) {
-		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
-		return openLoginView(page).login("admin@vaadin.com", "admin");
-	}
 
 	@Test
 	@Disabled
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void editOrder(UnifiedPage page) throws Exception {
-		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
-		setup(page);
-		StorefrontViewElement storefrontPage = openView(page);
-
+	@DisplayName("Adding one more of an order's first product updates its card")
+	public void editOrder(UnifiedPage page) {
+		page.navigate(StorefrontView.class);
 		int orderIndex = 1;
+		openOrder(page, orderIndex);
+		orderDetails(page).find(UnifiedButton.class).withId("edit").click();
+		int initialCount = amount(page).getValue();
 
-		OrderCardElement order = storefrontPage.getOrderCard(orderIndex);
-		Assertions.assertNotNull(order);
-		int initialCount = Integer.parseInt(order.getGoodsCount(0));
+		amount(page).setValue(initialCount + 1);
+		orderEditor(page).find(UnifiedButton.class).withId("review").click();
+		orderDetails(page).find(UnifiedButton.class).withId("save").click();
 
-		order.click();
-		ButtonElement editBtn = storefrontPage.getOrderDetails().getEditButton();
-		editBtn.click();
-		// TODO unified: TestBench Escape Hatch: waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"))
-		testBench.waitUntil(driver -> driver.getCurrentUrl().matches("^(.+)\\/(storefront)\\/[0-9]+\\/(edit)$"));
-
-		OrderEditorElement orderEditor = storefrontPage.getOrderEditor();
-		orderEditor.getOrderItemEditor(0).clickAmountFieldPlus();
-
-		orderEditor.review();
-		storefrontPage.getOrderDetails().getSaveButton().click();
-
-		// TODO unified: TestBench Escape Hatch: $(NotificationElement.class)
-		NotificationElement notification = testBench.$(NotificationElement.class).last();
-		Assertions.assertTrue(notification.getText().contains("was updated"));
-
-		order = storefrontPage.getOrderCard(orderIndex);
-		Assertions.assertNotNull(order);
-		int currentCount = Integer.parseInt(order.getGoodsCount(0));
-		Assertions.assertEquals(initialCount + 1, currentCount);
-
+		assertThat(page.find(UnifiedNotification.class).withTextContaining("was updated")).isOpen();
+		openOrder(page, orderIndex);
+		orderDetails(page).find(UnifiedButton.class).withId("edit").click();
+		assertThat(amount(page)).hasValue(initialCount + 1);
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void testDialogs(UnifiedPage page) throws Exception {
-		setup(page);
-		StorefrontViewElement storefrontPage = openView(page);
-		openAllDialogs(storefrontPage);
+	@DisplayName("The new-order editor and an order's details open and close, also after visiting another view")
+	public void testDialogs(UnifiedPage page) {
+		page.navigate(StorefrontView.class);
+		openAndCloseAllDialogs(page);
 
-		UsersViewElement usersPage = storefrontPage.getMenu().navigateToUsers();
-		storefrontPage = usersPage.getMenu().navigateToStorefront();
+		page.find(UnifiedTabs.class).selectTab("Users");
+		page.find(UnifiedTabs.class).selectTab("Storefront");
 
-		openAllDialogs(storefrontPage);
-	}
-
-	private void openAllDialogs(StorefrontViewElement storefrontPage) {
-		storefrontPage.getSearchBar().getCreateNewButton().click();
-		Assertions.assertTrue(storefrontPage.getDialog().get().isOpen());
-		storefrontPage.getOrderEditor().cancel();
-		Assertions.assertFalse(storefrontPage.getDialog().get().isOpen());
-
-		storefrontPage.getSearchBar().getCreateNewButton().click();
-		Assertions.assertTrue(storefrontPage.getDialog().get().isOpen());
-
-		storefrontPage.getOrderEditor().cancel();
-		Assertions.assertFalse(storefrontPage.getDialog().get().isOpen());
-
-		OrderCardElement order = storefrontPage.getOrderCard(0);
-		Assertions.assertNotNull(order);
-		order.click();
-
-		Assertions.assertTrue(storefrontPage.getOrderDetails().isDisplayed());
-
-		storefrontPage.getOrderDetails().getCancelButton().click();
-		Assertions.assertFalse(storefrontPage.getDialog().get().isOpen());
+		openAndCloseAllDialogs(page);
 	}
 
 	@Test
-	@RequiresTestingTool(TestingTool.SELENIUM)
-	public void testTextFieldValidation(UnifiedPage page) throws Exception {
-		setup(page);
-		StorefrontViewElement storefrontPage = openView(page);
+	@DisplayName("The order editor shows an error for a too long or an empty customer field")
+	public void testTextFieldValidation(UnifiedPage page) {
+		page.navigate(StorefrontView.class);
+		openOrder(page, new Random().nextInt(10));
+		orderDetails(page).find(UnifiedButton.class).withId("edit").click();
 
-		int orderIndex = new Random().nextInt(10);
-
-		OrderCardElement order = storefrontPage.getOrderCard(orderIndex);
-		Assertions.assertNotNull(order);
-		order.click();
-
-		ButtonElement editBtn = storefrontPage.getOrderDetails().getEditButton();
-		editBtn.click();
-
-		OrderEditorElement orderEditor = storefrontPage.getOrderEditor();
-		TextFieldElement customerNameField = orderEditor.getCustomerNameField();
-		testFieldOverflow(customerNameField);
-		testClearRequiredField(customerNameField);
-		testFieldOverflow(orderEditor.getCustomerDetailsField());
-
-		OrderItemEditorElement firstOrderItemEditor = orderEditor.getOrderItemEditor(0);
-		testFieldOverflow(firstOrderItemEditor.getCommentField());
+		UnifiedTextField customerName = orderEditor(page).find(UnifiedTextField.class).withLabel("Customer");
+		assertRejectsOverflow(customerName);
+		customerName.setValue("");
+		assertThat(customerName).hasErrorMessage("must not be blank");
+		assertRejectsOverflow(orderEditor(page).find(UnifiedTextField.class).withLabel("Additional Details"));
+		assertRejectsOverflow(firstOrderItem(page).find(UnifiedTextField.class).withId("comment"));
 	}
 
-	private void testFieldOverflow(TextFieldElement textFieldElement) {
-		textFieldElement.setValue(IntStream.range(0, 256).mapToObj(i -> "A").collect(Collectors.joining()));
-		String msg = getErrorMessage(textFieldElement);
-		Assertions.assertTrue(msg.matches("(maximum length is 255 characters|size must be between 0 and 255)"));
+	private static void openAndCloseAllDialogs(UnifiedPage page) {
+		page.step("Open and close the new-order editor and an order's details", () -> {
+			for (int i = 0; i < 2; i++) {
+				storefront(page).findTemplate(SearchBar.class).find(UnifiedButton.class).withId("action").click();
+				assertThat(dialog(page)).isOpen();
+				orderEditor(page).find(UnifiedButton.class).withId("cancel").click();
+				assertThat(dialog(page)).isClosed();
+			}
+
+			openOrder(page, 0);
+			assertThat(orderDetails(page)).isVisible();
+			orderDetails(page).find(UnifiedButton.class).withId("cancel").click();
+			assertThat(dialog(page)).isClosed();
+		});
 	}
 
-	private void testClearRequiredField(TextFieldElement textFieldElement) {
-		textFieldElement.setValue("");
-		Assertions.assertEquals("must not be blank", getErrorMessage(textFieldElement));
+	private static void assertRejectsOverflow(UnifiedTextField field) {
+		field.setValue("A".repeat(256));
+		assertThat(field).isInvalid().hasErrorMessage("maximum length is 255 characters");
 	}
 
-	private String getErrorMessage(TextFieldElement textFieldElement) {
-		return textFieldElement.getPropertyString("errorMessage");
+	/**
+	 * Clicks the order's card in the grid.
+	 * <p>
+	 * Escape Hatch kept: the card is drawn by a LitRenderer, and its click calls the renderer function
+	 * {@code cardClick}. In a browser it is clicked through {@link GridCellTasks} (a row click doesn't reach it).
+	 * Browserless can't fire a renderer function through the Unified API; {@code cardClick} navigates to the
+	 * order's route, so the test goes there.
+	 */
+	private static void openOrder(UnifiedPage page, int index) {
+		page.step("Open order card " + index, () -> {
+			UnifiedGrid orders = storefront(page).find(UnifiedGrid.class);
+			if (page.hasRealBrowser()) {
+				GridCellTasks.clickInCell(page, "storefront-view", index, 0, "order-card", "wrapper");
+			} else {
+				Order order = (Order) orders.unwrap(Grid.class).getDataCommunicator().getItem(index);
+				page.navigate("storefront/" + order.getId());
+			}
+			assertThat(dialog(page)).isOpen();
+		});
+	}
+
+	private static UnifiedTemplate storefront(UnifiedPage page) {
+		return page.findTemplate(StorefrontView.class);
+	}
+
+	private static UnifiedDialog dialog(UnifiedPage page) {
+		return storefront(page).find(UnifiedDialog.class);
+	}
+
+	private static UnifiedTemplate orderEditor(UnifiedPage page) {
+		return dialog(page).findTemplate(OrderEditor.class);
+	}
+
+	private static UnifiedTemplate orderDetails(UnifiedPage page) {
+		return dialog(page).findTemplate(OrderDetails.class);
+	}
+
+	private static UnifiedTemplate firstOrderItem(UnifiedPage page) {
+		return orderEditor(page).findTemplate(OrderItemEditor.class).all().get(0);
+	}
+
+	private static UnifiedIntegerField amount(UnifiedPage page) {
+		return firstOrderItem(page).find(UnifiedIntegerField.class).withId("amount");
 	}
 }

@@ -88,3 +88,38 @@ Smallest change to compile and to target the right server:
 On Browserless / Playwright every test is skipped (`@RequiresTestingTool(SELENIUM)`).
 
 Note: the `it` profile still starts a second app on :8080 that nobody uses now (cleaned up in step 6).
+
+## Step 4: Resolve the Migration Markers, rewrite the tests on the Unified API
+
+The `resolve-migration-markers` skill can't be started by an agent (`disable-model-invocation: true`), so I read it
+and `write-unified-ui-tests` and followed their steps by hand. Because the recipe left all the real code inside 16
+TestBench page objects (custom elements, untouched), "resolving markers" here meant **rewriting each test class**
+from the views' code, then deleting the page objects. One commit per class (4a–4e).
+
+Approach per class: read the view, explore with `page.describe()` / `grid.describe()` on Browserless and Playwright,
+write the test with `@DisplayName`, User Tasks (`page.step`) and retrying `assertThat`, run on all three tools.
+
+| Class | Result | Runs on | Notes |
+|---|---|---|---|
+| `LoginIT` (4) | rewritten with `UnifiedLogin.login(..)`, `isAt(..)`, `UnifiedTabs.selectTab("Logout")` | Playwright, Selenium (`@RequiresBrowser`) | The login form posts to Spring Security's `/login`, which Browserless can't do; these tests check the login itself, so no `@WithMockUser`. Passed first try. → [F6](findings.md#f6) |
+| `DashboardViewIT` (2) | `@WithUserDetails("admin@vaadin.com")`; counters via `findTemplate(DashboardView.class).findComponent(DashboardCounterLabel.class)` | counters: **all 3**; board rows: Selenium | Board rows exist only in the template's shadow DOM → TestBench Escape Hatch kept. → [F7](findings.md#f7), [F8](findings.md#f8) |
+| `ProductsViewIT` (3) | Crud fields by label, grid rows by `withCellText`, `UnifiedConfirmDialog` | Playwright, Selenium (`@RequiresBrowser`) | Flow's `Crud` can't be driven on Browserless; its pencil needs a per-tool Escape Hatch (`GridCellTasks`). A Playwright-only race found and fixed. → [F9](findings.md#f9), [F10](findings.md#f10), [F11](findings.md#f11) |
+| `UsersViewIT` (5) | as Products; `UnifiedEmailField`, `UnifiedPasswordField`, `UnifiedComboBox` | 4 Crud tests: browsers; `accessDenied`: **all 3** | Browserless crash on `UnifiedLink` lookups. → [F13](findings.md#f13), [F14](findings.md#f14) |
+| `StorefrontViewIT` (3, 1 `@Disabled`) | nested templates: `findTemplate(StorefrontView).find(UnifiedDialog).findTemplate(OrderEditor)…`, `@Id` buttons by `withId` | **all 3** | Order cards are LitRenderer content: browsers click them through `GridCellTasks`; Browserless navigates to the route the card's `cardClick` opens (Escape Hatch kept, documented). → [F15](findings.md#f15) |
+
+Other changes:
+
+- `AbstractIT` is now only `@UnifiedSpringBootTest` plus the `NOTIFICATION_DURATION` tweak, one Spring context for all
+  classes. The window resize to 1024×800 (Escape Hatch) is dropped: no setting exists for it and the tests pass at
+  the default size → [F16](findings.md#f16).
+- `CrudTasks` (Crud lookups / User Tasks) and `GridCellTasks` (the one Escape Hatch for renderer-drawn cell
+  content, for Playwright via Dramafinder and Selenium via TestBench) are shared by the test classes.
+- Deleted the 16 page objects in `testbench/elements` (nothing uses them).
+- Checks changed on purpose:
+  - `editProduct` no longer checks that the URL gets longer when the editor opens ([F11](findings.md#f11)).
+  - The overflow checks expected *either* `maximum length is 255 characters` *or* `size must be between 0 and 255`.
+    They now expect the first, which all three tools show.
+  - `LoginIT.loginWorks` checks the "Email" field exists, not its label read from the TestBench element.
+- `StorefrontViewIT.editOrder` stays `@Disabled` as before (disabled without a reason in #1431). Rewritten, it
+  **passes on all three tools** when the condition is deactivated, so it could be re-enabled.
+- Migration Markers left: **0**.

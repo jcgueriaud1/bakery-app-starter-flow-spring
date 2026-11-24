@@ -175,3 +175,22 @@ The step where it was found refers to [MIGRATION_LOG.md](MIGRATION_LOG.md).
   which are hidden, while the Findable View does (`(hidden)`). Adding `(hidden)` to the `Found` list would point
   straight at `.visible()`.
 
+## F15: The Findable View suggests nothing for a Template's `@Id` components whose text is in the template HTML (api)
+
+- **Step:** 4 (`StorefrontViewIT`)
+- On Browserless, inside `order-details`, the view prints `button (no name)  not unique: 5 alike` five times, and in
+  `order-editor` `combo box (no name)  not unique: 3 alike`. They are `@Id` fields (`edit`, `save`, `cancel`, …), and
+  `withId(..)` is exactly what the docs recommend inside a Template, but the view doesn't suggest it (alpha5 added
+  `data-*` disambiguation, not id). On Playwright the same buttons show their text.
+- **Suggestion:** inside a Template, fall back to `withId("…")` for a component with an id, at least for `@Id` fields.
+- Related: the page-level Findable View stops at `Template <storefront-view>`; you have to call `describe()` on each
+  nested template to discover the dialog, then the editor, then the item editor. Fine, but a hint like
+  `Template <storefront-view> (has a dialog, a grid, 2 templates)` would save a few rounds.
+
+## F16: No setting for the browser window size (api, minor)
+
+- **Step:** 4 (`AbstractIT`)
+- The TestBench base resized the window to 1024×800 before each test. There's no `vaadin.testing.*` setting for a
+  viewport/window size (Playwright and Selenium); the only way is an Escape Hatch per tool, which would make every
+  test tool-specific. Dropped it; the tests pass at the default size. Responsive apps will want this.
+

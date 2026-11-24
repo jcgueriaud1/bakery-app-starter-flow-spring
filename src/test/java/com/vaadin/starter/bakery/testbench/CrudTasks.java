@@ -1,16 +1,10 @@
 package com.vaadin.starter.bakery.testbench;
 
-import java.util.Optional;
-
-import org.vaadin.addons.dramafinder.element.GridElement;
-
-import com.microsoft.playwright.Page;
 import com.vaadin.starter.bakery.ui.components.SearchBar;
 import com.vaadin.testing.unified.UnifiedPage;
 import com.vaadin.testing.unified.component.UnifiedButton;
 import com.vaadin.testing.unified.component.UnifiedGrid;
 import com.vaadin.testing.unified.component.UnifiedGrid.UnifiedGridRow;
-import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
 
 /**
  * Lookups and User Tasks shared by the views built on {@code AbstractBakeryCrudView} (Products, Users).
@@ -42,26 +36,11 @@ final class CrudTasks {
 		return page.find(UnifiedButton.class).withText("Delete").visible();
 	}
 
-	/**
-	 * Presses the Crud's edit button (the pencil) on a row.
-	 * <p>
-	 * Escape Hatch kept: the pencil is drawn by the {@code vaadin-crud} renderer in a column without a header. It is
-	 * not a Flow component, so no Unified lookup finds it, and {@code row.cell(..)} needs a header. Each browser
-	 * Testing Tool clicks it with its own API. The Playwright click doesn't wait for the server: check what the
-	 * editor shows before typing into it.
-	 */
+	/** Presses the Crud's edit button (the pencil) on a row; see {@link GridCellTasks} for why it's an Escape Hatch. */
 	static void openForEditing(UnifiedPage page, UnifiedGridRow row) {
 		page.step("Edit " + row, () -> {
-			int index = row.getIndex();
 			int editColumn = page.find(UnifiedGrid.class).getColumnHeaders().size() - 1;
-			Optional<Page> playwright = page.tryUnwrap(Page.class);
-			if (playwright.isPresent()) {
-				GridElement.get(playwright.get()).findCell(index, editColumn).orElseThrow()
-						.getCellContentLocator().locator("vaadin-crud-edit").click();
-			} else {
-				TestBenchEscapeHatch.of(page).$(com.vaadin.flow.component.grid.testbench.GridElement.class).first()
-						.getCell(index, editColumn).$("vaadin-crud-edit").first().click();
-			}
+			GridCellTasks.clickInCell(page, null, row.getIndex(), editColumn, "vaadin-crud-edit", null);
 		});
 	}
 }
