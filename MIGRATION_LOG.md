@@ -152,3 +152,42 @@ No commit for this step.
   image). Both are probably broken by the move to `@UnifiedSpringBootTest` → [F17](findings.md#f17).
 
 Sanity run `mvn verify -Pit` (Browserless): 17 UI tests, 4 run and pass, 13 skipped (browser-only or `@Disabled`).
+
+## Step 7: Style rules and final runs
+
+**Style rules:** added `unified-test-archunit` and `UnifiedStyleTest` (`UnifiedStyleRules.ALL` over
+`com.vaadin.starter.bakery`). First run: 3 violations of *Testing Tool code needs its Capability*, all from
+`StorefrontViewIT.openOrder` calling `unwrap(Grid.class)` in its Browserless branch. Switched that branch to
+`tryUnwrap(Grid.class)`, which the rule accepts as a per-tool branch → **0 violations**. (The rules don't follow calls
+into `CrudTasks` / `GridCellTasks`, as documented; those are only reached from `@RequiresBrowser` tests or through
+per-tool branches.)
+
+**Final runs** (`mvn -B verify -Pit [-Dvaadin.testing.tool=…]`, whole build incl. the Vaadin frontend build, same
+machine; each run twice, both green). The baseline was re-timed now on the pre-migration commit for a fair comparison
+(step 0's 73 s was a cold run).
+
+| | Baseline TestBench | Unified · Browserless | Unified · Playwright | Unified · Selenium |
+|---|---|---|---|---|
+| UI tests passed / skipped | 16 / 1 | **4** / 13 | **15** / 2 | **16** / 1 |
+| Wall-clock `mvn verify -Pit` (run 1 / run 2) | 51 s / 43 s | 17 s / 18 s | 38 s / 38 s | 41 s / 41 s |
+| Of which in Failsafe (sum of classes) | ~20 s (classes in parallel) + app start by `spring-boot:start` | ~9 s (8 s is the Spring context) | ~29 s | ~30 s |
+| Flaky in 2 runs | 0 | 0 | 0 | 0 |
+
+The 4 Browserless tests: `DashboardViewIT.checkCounters`, `StorefrontViewIT.testDialogs`,
+`StorefrontViewIT.testTextFieldValidation`, `UsersViewIT.accessDenied`. On Browserless they take about 0.5 s together
+once the Spring context is up.
+
+Skipped, and why:
+
+| Test | Browserless | Playwright | Selenium | Reason |
+|---|---|---|---|---|
+| `LoginIT` ×4 | skip | ✔ | ✔ | `@RequiresBrowser`: the login form posts to Spring Security's `/login` |
+| `ProductsViewIT` ×3, `UsersViewIT` ×4 | skip | ✔ | ✔ | `@RequiresBrowser`: Flow `Crud` ([F9](findings.md#f9)) |
+| `DashboardViewIT.checkRowsCount` | skip | skip | ✔ | `@RequiresTestingTool(SELENIUM)`: shadow-DOM-only board rows ([F7](findings.md#f7)) |
+| `StorefrontViewIT.editOrder` | skip | skip | skip | `@Disabled` since before the migration (passes on all 3 if enabled) |
+
+Escape Hatches left: 2 places. `GridCellTasks.clickInCell` (Crud pencil and order card, browsers) plus its Browserless
+twin in `StorefrontViewIT.openOrder`, and `DashboardViewIT.checkRowsCount`. Each has a comment saying why.
+
+Code size: test code went from 944 lines (6 classes + 16 page objects) to 703 lines (5 test classes, `AbstractIT`, `CrudTasks`, `GridCellTasks`, `UnifiedStyleTest`; no page
+objects): `git diff --stat e927b3c -- src/test` gives 26 files, +564 −807.
