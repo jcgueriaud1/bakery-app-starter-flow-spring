@@ -32,6 +32,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 
 ## Details
 
+<a id="f1"></a>
+
 ## F1: `FindTestClassesToMigrate` reports no page objects and no "migrates partly" (recipe)
 
 - **Step:** 1 (dry run)
@@ -44,6 +46,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 - **Guess:** the analysis only looks at element types used directly in the class's own body, not through the base class or
   through the return types of page-object methods.
 - **Impact:** the dry run overstates how much will migrate; a user can't plan the Wrapper work from it.
+
+<a id="f2"></a>
 
 ## F2: Hard-coded `:8080` base URL survives the switch to `@UnifiedSpringBootTest` (recipe)
 
@@ -60,6 +64,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   `localhost:8080`, not just constant-concatenation call sites; ideally rewrite `driver.get(url)` with a String
   parameter to `page.navigate(path)`.
 
+<a id="f3"></a>
+
 ## F3: No Migration Marker on calls into custom elements / page objects (recipe)
 
 - **Step:** 2
@@ -72,6 +78,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   marker-by-marker) would miss most of the work.
 - Related to [F1](#f1): the same blind spot in the dry run.
 
+<a id="f4"></a>
+
 ## F4: Recipe emits `testBench.getRunLocallyBrowser()`, which doesn't compile (recipe)
 
 - **Step:** 2
@@ -80,6 +88,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   compilation error. The only compile error of the run.
 - **Suggestion:** either expose it on the Escape Hatch or treat it like `@RunLocally` (*“browser setup removed”* marker).
 
+<a id="f5"></a>
+
 ## F5: Login marker on a statement that doesn't sign in (recipe, minor)
 
 - **Step:** 2
@@ -87,6 +97,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   *“signs in through the login form: … consider @WithMockUser”* – any statement calling a method on the login element is
   marked, not only the one that submits. Also, it's a `LoginIT`: every test there checks the login itself, so
   `@WithMockUser` advice is noise for that class.
+
+<a id="f6"></a>
 
 ## F6: Password masking redacts the same word everywhere, incl. the user name and `@DisplayName` (bug)
 
@@ -105,6 +117,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 - **Suggestion:** mask only the value typed into the password field (and the field's value in failures), not a global
   find/replace; or at least don't mask inside the display name and inside a longer word / e-mail.
 
+<a id="f7"></a>
+
 ## F7: No way to reach plain HTML written in a template's shadow DOM, even in a browser (api)
 
 - **Step:** 4 (`DashboardViewIT.checkRowsCount`)
@@ -118,12 +132,16 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 - **Suggestion:** document that `UnifiedElement.findDescendants` doesn't pierce shadow roots; consider a browser-only
   `findDescendants` that does (Playwright's CSS engine pierces open shadow roots by default anyway).
 
+<a id="f8"></a>
+
 ## F8 (positive): `@WithUserDetails` + `@Id` components in a Template work on Browserless
 
 - **Step:** 4 (`DashboardViewIT.checkCounters`)
 - `@WithUserDetails("admin@vaadin.com")` (the app's own `UserDetailsService`) signed the user in on all three tools with
   no extra setup, and `page.findTemplate(DashboardView.class).findComponent(DashboardCounterLabel.class)` with
   `hasCount(4)` passes on Browserless, Playwright and Selenium. The test used to need a real browser + login form.
+
+<a id="f9"></a>
 
 ## F9: Flow's `Crud` has no Wrapper and can't be driven on Browserless (api, gap)
 
@@ -144,6 +162,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   dialogs) with Browserless support that fires the Crud's events; `UnifiedGridRow.cell(int columnIndex)`; list
   `Crud` under the known gaps.
 
+<a id="f10"></a>
+
 ## F10: An Escape Hatch action on Playwright doesn't wait for the server, and the next Unified action doesn't either (bug-ish / docs)
 
 - **Step:** 4 (`ProductsViewIT.editProductTwice`, Playwright only, deterministic)
@@ -159,6 +179,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 - **Suggestions:** make the Playwright adapter's actions wait for Vaadin's idle state before acting (not only after),
   or offer `page.waitForServer()` for Escape Hatch code; mention this pitfall next to the Escape Hatch docs.
 
+<a id="f11"></a>
+
 ## F11: `assertThat(page).hasPath(..)` is exact only; no way to read the current path (api, minor)
 
 - **Step:** 4 (`ProductsViewIT.editProduct`)
@@ -167,6 +189,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   `isAt(ProductsView.class)` can't tell `products` from `products/42`.
 - **Suggestion:** `hasPathStartingWith(..)` / `hasPathMatching(regex)` or a `currentPath()` read.
 
+<a id="f12"></a>
+
 ## F12: Small report / Findable View wording issues (info)
 
 - A User Step for a `page.step("Edit " + row, ..)` reads `Edit row().withCellText("Product Name", "…")`: a grid row's
@@ -174,6 +198,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 - Before the template was entered, the Findable View printed
   `page.findTemplate(<the class with @Tag("search-bar")>.class)` instead of `SearchBar.class` (it printed the real
   class name in the same run after the first `findTemplate(SearchBar.class)` call).
+
+<a id="f13"></a>
 
 ## F13: On Browserless, `page.find(UnifiedLink.class)` throws when the page holds a Flow `Text` component (bug, high)
 
@@ -194,6 +220,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
 - **Repro (Browserless):** a view with `add(new Text("x"), new RouterLink("Home", HomeView.class))`, then
   `page.find(UnifiedLink.class).withText("Home").click()`.
 
+<a id="f14"></a>
+
 ## F14: The default Crud/confirm-dialog lookups need `.visible()` everywhere (info)
 
 - **Step:** 4
@@ -202,6 +230,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   `UnifiedConfirmDialog` without a header filter. The failure message (`Found 4: button “Cancel”, …`) doesn't say
   which are hidden, while the Findable View does (`(hidden)`). Adding `(hidden)` to the `Found` list would point
   straight at `.visible()`.
+
+<a id="f15"></a>
 
 ## F15: The Findable View suggests nothing for a Template's `@Id` components whose text is in the template HTML (api)
 
@@ -215,12 +245,16 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
   nested template to discover the dialog, then the editor, then the item editor. Fine, but a hint like
   `Template <storefront-view> (has a dialog, a grid, 2 templates)` would save a few rounds.
 
+<a id="f16"></a>
+
 ## F16: No setting for the browser window size (api, minor)
 
 - **Step:** 4 (`AbstractIT`)
 - The TestBench base resized the window to 1024×800 before each test. There's no `vaadin.testing.*` setting for a
   viewport/window size (Playwright and Selenium); the only way is an Escape Hatch per tool, which would make every
   test tool-specific. Dropped it; the tests pass at the default size. Responsive apps will want this.
+
+<a id="f17"></a>
 
 ## F17: `springBootTest: true` silently changes what the other Failsafe profiles test (recipe / docs)
 
@@ -234,6 +268,8 @@ alpha4 vs alpha5: see [MIGRATION_LOG.md, Step 8](MIGRATION_LOG.md#step-8-compari
     Chrome.
 - The marker only talks about removing `spring-boot:start/stop`. **Suggestion:** a marker on each profile that
   starts/targets an external server or a remote grid; document remote Selenium grids (or their absence).
+
+<a id="f18"></a>
 
 ## F18: The recipe keeps `vaadin-testbench-junit6`, which is not needed once page objects are gone (info)
 
