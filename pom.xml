@@ -79,6 +79,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>org.vaadin.addons</groupId>
+                <artifactId>unified-test-bom</artifactId>
+                <version>0.1.0-alpha5</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -87,6 +94,11 @@
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>browserless-test-spring</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
@@ -133,7 +145,32 @@
         <!-- Testing -->
         <dependency>
             <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-testbench-junit5</artifactId>
+            <artifactId>vaadin-testbench-junit6</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-browserless</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-playwright</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-selenium</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons</groupId>
+            <artifactId>unified-test-spring</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -212,6 +249,7 @@
                             <enableAssertions>true</enableAssertions>
                             <systemPropertyVariables>
                                 <com.vaadin.testbench.Parameters.runLocally>chrome</com.vaadin.testbench.Parameters.runLocally>
+                                <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/unified-evidence</vaadin.testing.evidence-dir>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>
@@ -267,6 +305,7 @@
                                 <sauce.sauceAccessKey>${sauce.sauceAccessKey}</sauce.sauceAccessKey>
                                 <sauce.options>${sauce.options}</sauce.options>
                                 <com.vaadin.testbench.Parameters.gridBrowsers>${com.vaadin.testbench.Parameters.gridBrowsers}</com.vaadin.testbench.Parameters.gridBrowsers>
+                                <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/unified-evidence</vaadin.testing.evidence-dir>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>
@@ -332,6 +371,7 @@
                             <enableAssertions>true</enableAssertions>
                             <systemPropertyVariables>
                                 <com.vaadin.testbench.Parameters.runLocally>chrome</com.vaadin.testbench.Parameters.runLocally>
+                                <vaadin.testing.evidence-dir>${project.build.directory}/failsafe-reports/unified-evidence</vaadin.testing.evidence-dir>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

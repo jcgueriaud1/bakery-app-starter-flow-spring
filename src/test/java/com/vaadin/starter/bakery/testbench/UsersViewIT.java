@@ -10,8 +10,12 @@ import com.vaadin.flow.component.textfield.testbench.EmailFieldElement;
 import com.vaadin.flow.component.textfield.testbench.PasswordFieldElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
 import com.vaadin.starter.bakery.testbench.elements.ui.UsersViewElement;
-import com.vaadin.testbench.BrowserTest;
 import com.vaadin.testbench.TestBenchElement;
+import com.vaadin.testing.unified.RequiresTestingTool;
+import com.vaadin.testing.unified.TestingTool;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.selenium.TestBenchEscapeHatch;
+
 import org.junit.jupiter.api.parallel.Isolated;
 
 @Isolated
@@ -20,14 +24,17 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 	private static Random r = new Random();
 
 	@Override
-	protected UsersViewElement openView() {
-		StorefrontViewElement storefront = openLoginView().login("admin@vaadin.com", "admin");
+	protected UsersViewElement openView(UnifiedPage page) {
+		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
+		StorefrontViewElement storefront = openLoginView(page).login("admin@vaadin.com", "admin");
 		return storefront.getMenu().navigateToUsers();
 	}
 
-	@BrowserTest
-	public void updatePassword() {
-		UsersViewElement usersView = openView();
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void updatePassword(UnifiedPage page) throws Exception {
+		setup(page);
+		UsersViewElement usersView = openView(page);
 
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 
@@ -99,9 +106,11 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertFalse(usersView.getCrud().isEditorOpen());
 	}
 
-	@BrowserTest
-	public void tryToUpdateLockedEntity() {
-		UsersViewElement page = openView();
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void tryToUpdateLockedEntity(UnifiedPage unifiedPage) throws Exception {
+		setup(unifiedPage);
+		UsersViewElement page = openView(unifiedPage);
 
 		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
 		page.openRowForEditing(rowNum);
@@ -114,9 +123,11 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
 	}
 
-	@BrowserTest
-	public void tryToDeleteLockedEntity() {
-		UsersViewElement page = openView();
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void tryToDeleteLockedEntity(UnifiedPage unifiedPage) throws Exception {
+		setup(unifiedPage);
+		UsersViewElement page = openView(unifiedPage);
 
 		int rowNum = page.getCrud().getGrid().getCell("barista@vaadin.com").getRow();
 		page.openRowForEditing(rowNum);
@@ -129,9 +140,11 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertEquals(rowNum, page.getCrud().getGrid().getCell("barista@vaadin.com").getRow());
 	}
 
-	@BrowserTest
-	public void testCancelConfirmationMessage() {
-		UsersViewElement page = openView();
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void testCancelConfirmationMessage(UnifiedPage unifiedPage) throws Exception {
+		setup(unifiedPage);
+		UsersViewElement page = openView(unifiedPage);
 		page.getSearchBar().getCreateNewButton().click();
 		page.getFirstName().setValue("Some name");
 		page.getCrud().getEditorCancelButton().click();
@@ -139,13 +152,20 @@ public class UsersViewIT extends AbstractIT<UsersViewElement> {
 		Assertions.assertEquals(page.getDiscardConfirmDialog().getHeaderText(), "Discard changes");
 	}
 
-	@BrowserTest
-	public void accessDenied() {
-		StorefrontViewElement storefront = openLoginView().login("barista@vaadin.com", "barista");
+	@Test
+	@RequiresTestingTool(TestingTool.SELENIUM)
+	public void accessDenied(UnifiedPage page) throws Exception {
+		TestBenchEscapeHatch testBench = TestBenchEscapeHatch.of(page);
+		setup(page);
+		// TODO unified: signs in through the login form: unless this test checks the login itself, consider @WithMockUser; to keep the form, page.find(UnifiedLogin.class).login(username, password)
+		StorefrontViewElement storefront = openLoginView(page).login("barista@vaadin.com", "barista");
 		Assertions.assertEquals(3, storefront.getMenu().$(TabElement.class).all().size());
 
-		getDriver().get(APP_URL + "users");
-		TestBenchElement link404 = $("vaadin-app-layout > div > a").waitForFirst();
+		// TODO unified: navigation to APP_URL + "users": not a local application URL the recipe can read; use page.navigate("<path>")
+		// TODO unified: TestBench Escape Hatch: getDriver()
+		testBench.getDriver().get(APP_URL + "users");
+		// TODO unified: TestBench Escape Hatch: $("vaadin-app-layout > div > a")
+		TestBenchElement link404 = testBench.$("vaadin-app-layout > div > a").waitForFirst();
 
 		Assertions.assertEquals("Go to the front page.", link404.getText());
 	}
