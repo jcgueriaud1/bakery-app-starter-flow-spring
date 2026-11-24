@@ -18,18 +18,28 @@ Note that when running in development mode, the application will not work in IE1
 
 # Running Integration Tests and Linter
 
-Integration tests are implemented using TestBench. The tests take a couple of minutes to run and are therefore included in a separate profile. We recommend running tests with a production build to minimize the chance of development time toolchains affecting test stability. To run the tests, execute
+The UI tests (`src/test/java/.../testbench/*IT.java`) are [Unified UI Tests](https://github.com/parttio/unified-testing-tool)
+(0.1.0-alpha5): each test class starts the application itself (`@UnifiedSpringBootTest`), and the same test runs on the
+Testing Tool you choose. They are in a separate profile:
 
-`mvn verify -Pit,production`
-
-and make sure you have a valid TestBench license installed.
-
-Profile `it` adds the following parameter to run integration tests:
 ```sh
--Dcom.vaadin.testbench.Parameters.runLocally=chrome
+mvn verify -Pit                                        # Browserless (no browser): 4 tests, the others are skipped
+mvn verify -Pit -Dvaadin.testing.tool=playwright       # headless Chromium, downloaded on the first run: 15 tests
+mvn verify -Pit -Dvaadin.testing.tool=selenium         # headless Chrome through TestBench: 16 tests
 ```
 
-if you would like to run a separate test make sure you have added these parameters to VM Options of JUnit run configuration
+A test that needs a browser says so with `@RequiresBrowser` (the login form, the Products and Users views' `Crud`), and
+the one test that needs TestBench with `@RequiresTestingTool(SELENIUM)`. The Selenium run needs a valid TestBench
+license. Each run writes a report to `target/failsafe-reports/unified-evidence/` (`summary.md`, `report.html`, and the
+User Steps of every test).
+
+How the tests were migrated from TestBench:
+
+- [MIGRATION_LOG.md](MIGRATION_LOG.md): the steps, the results per Testing Tool, and the comparison with the alpha4 migration
+- [findings.md](findings.md): the issues found
+- [Migration PR (draft)](https://github.com/jcgueriaud1/bakery-app-starter-flow-spring/pull/2)
+- Findings filed upstream: [parttio/unified-testing-tool#602](https://github.com/parttio/unified-testing-tool/issues/602)
+  and its sub-issues [#603](https://github.com/parttio/unified-testing-tool/issues/603)–[#610](https://github.com/parttio/unified-testing-tool/issues/610)
 
 # Automatic Restart and Live Reload
 
@@ -94,4 +104,4 @@ Pro components used in the starter are :
  - [Vaadin Charts](https://vaadin.com/components/vaadin-charts)
  - [Vaadin Confirm Dialog](https://vaadin.com/components/vaadin-confirm-dialog) 
 
- Also the tests are created using [Testbench](https://vaadin.com/testbench) library.
+ The UI tests use [TestBench](https://vaadin.com/testbench) when they run on Selenium (`-Dvaadin.testing.tool=selenium`).
