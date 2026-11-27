@@ -37,6 +37,7 @@ How the tests were migrated from TestBench:
 
 - [MIGRATION_LOG.md](MIGRATION_LOG.md): the steps, the results per Testing Tool, and the comparison with the alpha4 migration
 - [findings.md](findings.md): the issues found
+- [unified-testing-efficiency.md](unified-testing-efficiency.md): TestBench vs the Unified Testing Tool, for writing and running the tests
 - [Migration PR (draft)](https://github.com/jcgueriaud1/bakery-app-starter-flow-spring/pull/2)
 - Findings filed upstream: [parttio/unified-testing-tool#602](https://github.com/parttio/unified-testing-tool/issues/602)
   and its sub-issues [#603](https://github.com/parttio/unified-testing-tool/issues/603)–[#610](https://github.com/parttio/unified-testing-tool/issues/610)
