@@ -1,49 +1,73 @@
 package com.vaadin.starter.bakery.testbench;
 
-import org.junit.jupiter.api.Assertions;
+import static com.vaadin.testing.unified.assertion.UnifiedAssertions.assertThat;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.vaadin.starter.bakery.testbench.elements.ui.DashboardViewElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.LoginViewElement;
-import com.vaadin.starter.bakery.testbench.elements.ui.StorefrontViewElement;
-import com.vaadin.testbench.BrowserTest;
+import com.vaadin.starter.bakery.ui.views.dashboard.DashboardView;
+import com.vaadin.starter.bakery.ui.views.login.LoginView;
+import com.vaadin.starter.bakery.ui.views.storefront.StorefrontView;
+import com.vaadin.testing.unified.RequiresBrowser;
+import com.vaadin.testing.unified.UnifiedPage;
+import com.vaadin.testing.unified.component.UnifiedLogin;
+import com.vaadin.testing.unified.component.UnifiedTabs;
+import com.vaadin.testing.unified.component.UnifiedTextField;
 
-public class LoginIT extends AbstractIT<LoginViewElement> {
+// These tests check the login form itself, which posts to Spring Security's /login: a browser is needed.
+@RequiresBrowser
+public class LoginIT extends AbstractIT {
 
-	@BrowserTest
-	public void loginWorks() {
-		LoginViewElement loginView = openLoginView();
-		Assertions.assertEquals("Email", loginView.getUsernameLabel());
-		loginView.login("barista@vaadin.com", "barista");
+	@Test
+	@DisplayName("A barista signs in through the login form and lands on the storefront")
+	public void loginWorks(UnifiedPage page) {
+		page.navigate(LoginView.class);
+		UnifiedLogin login = page.find(UnifiedLogin.class);
+		assertThat(login).isOpen();
+		assertThat(page.find(UnifiedTextField.class).withLabel("Email")).exists();
+
+		login.login("barista@vaadin.com", "barista");
+
+		assertThat(page).isAt(StorefrontView.class);
 	}
 
-	@BrowserTest
-	public void logout() {
-		LoginViewElement loginView = openLoginView();
-		StorefrontViewElement storefront = loginView.login("barista@vaadin.com", "barista");
-		storefront.getMenu().logout();
-		Assertions.assertTrue(getDriver().getCurrentUrl().endsWith("login"));
+	@Test
+	@DisplayName("A signed-in barista logs out from the menu and is back at the login")
+	public void logout(UnifiedPage page) {
+		signIn(page, "barista@vaadin.com", "barista");
+		assertThat(page).isAt(StorefrontView.class);
+
+		page.find(UnifiedTabs.class).selectTab("Logout");
+
+		assertThat(page).isAt(LoginView.class);
 	}
 
-	@BrowserTest
-	public void loginToNotDefaultUrl() {
-		LoginViewElement loginView = openLoginView(getDriver(), APP_URL + "dashboard");
-		DashboardViewElement dashboard = loginView.login("admin@vaadin.com", "admin", DashboardViewElement.class);
-		Assertions.assertNotNull(dashboard);
+	@Test
+	@DisplayName("Opening the dashboard signed out asks to sign in, then shows the dashboard")
+	public void loginToNotDefaultUrl(UnifiedPage page) {
+		page.navigate(DashboardView.class);
+		assertThat(page).isAt(LoginView.class);
+
+		page.find(UnifiedLogin.class).login("admin@vaadin.com", "admin");
+
+		assertThat(page).isAt(DashboardView.class);
 	}
 
-	@BrowserTest
-	public void openLoginAfterLoggedIn() {
-		loginToNotDefaultUrl();
-		// Navigating to /login after user is logged in will forward to storefront view
-		getDriver().get(APP_URL + "login");
-		$(StorefrontViewElement.class).onPage().waitForFirst();
-		Assertions.assertTrue($(LoginViewElement.class).all().isEmpty());
+	@Test
+	@DisplayName("Opening the login while signed in shows the storefront instead")
+	public void openLoginAfterLoggedIn(UnifiedPage page) {
+		signIn(page, "admin@vaadin.com", "admin");
+
+		page.navigate(LoginView.class);
+
+		assertThat(page).isAt(StorefrontView.class);
+		assertThat(page.find(UnifiedLogin.class)).doesNotExist();
 	}
 
-	@Override
-	protected LoginViewElement openView() {
-		return openLoginView();
+	private static void signIn(UnifiedPage page, String user, String password) {
+		page.step("Sign in as " + user, () -> {
+			page.navigate(LoginView.class);
+			page.find(UnifiedLogin.class).login(user, password);
+		});
 	}
-
 }
